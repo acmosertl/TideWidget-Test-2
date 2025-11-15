@@ -12,7 +12,7 @@
         padding: 0;
         font-family: sans-serif;
         color: white;
-        background-color: transparent; /* উইজেটের বাইরের ব্যাকগ্রাউন্ড */
+        background-color: transparent; 
     }
     #madhabam-tide-widget {
         max-width: 360px;
@@ -20,27 +20,85 @@
         padding: 0;
     }
 
-    /* ২. উইজেটের প্রধান প্যানেল স্টাইল */
+    /* ২. ওয়েভ অ্যানিমেশন স্টাইল (SVG থেকে এখানে আনা হলো) */
+    .wave{
+        fill:none;
+        stroke:#FFF;
+        stroke-width:2;
+        stroke-linecap:round;
+        stroke-linejoin:round;
+        animation:wave-motion 2s linear infinite alternate;
+    }
+    @keyframes wave-motion{
+        0%{transform:translateY(0px);}
+        100%{transform:translateY(-2px);}
+    }
+
+    /* ৩. উইজেটের প্রধান প্যানেল স্টাইল */
     .tide-panel {
         display: flex;
-        /* height: 300px;  <-- উচ্চতা সরানো হলো, কন্টেন্ট অনুযায়ী অটো হবে */
-        background-color: #00575e; /* উইজেটের ব্যাকগ্রাউন্ড (গাড় সবুজ) */
+        background-color: #00575e; 
         border-radius: 15px;
         padding: 15px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         color: #fff;
         box-sizing: border-box; 
-        position: relative; /* জলস্তর বারের অ্যাবসোলিউট পজিশনিং-এর জন্য */
+        position: relative; 
     }
 
-    /* ৩. উইজেটের বাম দিকের অংশ (জলস্তর বার ছাড়া) */
+    /* ৪. জলস্তর বার স্টাইল (স্ক্রিনশট ২ এর মতো) */
+    .level-indicator-container {
+        /* ডানদিকে স্থির ও কন্টেন্ট এর উচ্চতা অনুযায়ী */
+        position: absolute; 
+        right: 15px; 
+        top: 15px;
+        bottom: 15px; 
+        width: 40px;
+        display: flex;
+        align-items: flex-end;
+        z-index: 10;
+    }
+
+    .level-indicator-bar {
+        width: 25px;
+        height: 100%; 
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        position: relative; 
+        overflow: hidden;
+    }
+
+    .water-fill {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background: linear-gradient(to top, #36aee0, #7ec0ee); 
+        transition: height 0.5s ease-out; 
+    }
+
+    /* ৫. জলস্তর টেক্সট স্টাইল (ডাইনামিক পজিশনিং) */
+    .water-level-text {
+        position: absolute;
+        right: 45px; /* বারের বাম দিকে */
+        color: #000;
+        font-size: 0.8em; 
+        font-weight: bold;
+        z-index: 10;
+        text-shadow: 0 0 2px #fff;
+        transform: translateY(50%); /* এই ট্রান্সফর্মটি ডাইনামিক bottom-এর সাথে সঠিক পজিশন দেবে */
+        transition: bottom 0.5s ease-out; /* টেক্সট এর মুভমেন্ট স্মুথ করার জন্য */
+    }
+
+    /* ৬. বাম কন্টেন্ট স্টাইল */
     .tide-content {
         flex: 1;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        padding-right: 20px; /* জলস্তর বারের থেকে পর্যাপ্ত দূরত্ব */
-        z-index: 10; /* জলস্তর বারের উপরে রাখতে */
+        padding-right: 20px; 
+        /* জলস্তর বারটি অ্যাবসোলিউট পজিশনিং হওয়ায়, কন্টেন্টের প্রস্থ ঠিক করতে হবে */
+        max-width: calc(100% - 40px - 20px - 15px); /* প্যানেল প্রস্থ - বার প্রস্থ - ডান প্যাডিং - বাম প্যাডিং */
     }
 
     .tide-header-section {
@@ -99,18 +157,22 @@
         color: #f7d730;
     }
     
+    /* ৭. হাইলাইট স্টাইল */
     .highlight {
         background-color: rgba(255, 255, 255, 0.2); 
-        margin: 0 -15px; /* পুরো প্যানেল প্রস্থে হাইলাইট করার জন্য নেগেটিভ মার্জিন */
-        padding: 6px 15px; 
+        margin: 0 -15px; /* বাম প্যাডিং বরাবর */
+        padding: 6px 15px 6px 15px; 
         border-radius: 4px;
     }
     .highlight .tide-item-compact {
         border-bottom: none;
         padding: 0;
     }
+    .highlight .tide-text-stack {
+        margin-left: 10px; /* হাইলাইট অবস্থায় ফিক্স করা হলো */
+    }
 
-    /* ফুটার স্টাইল */
+    /* ৮. ফুটার স্টাইল */
     .footer-tags-section {
         margin-top: 15px;
         font-size: 0.85em;
@@ -123,47 +185,6 @@
         color: #f7d730;
     }
     
-    /* ৪. জলস্তর বার স্টাইল (গুরুত্বপূর্ণ পরিবর্তন) */
-    .level-indicator-container {
-        position: absolute; /* প্যানেলের সাপেক্ষে ফ্লোটিং */
-        right: 15px; /* ডান দিক থেকে দূরত্ব */
-        top: 15px;
-        bottom: 15px; /* ফুটার পর্যন্ত উচ্চতা */
-        width: 40px;
-        display: flex;
-        align-items: flex-end;
-    }
-
-    .level-indicator-bar {
-        width: 25px;
-        height: 100%; 
-        background-color: rgba(255, 255, 255, 0.1);
-        border-radius: 12px;
-        position: relative; /* water-fill এর জন্য */
-        overflow: hidden;
-    }
-
-    .water-fill {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        background: linear-gradient(to top, #36aee0, #7ec0ee); 
-        transition: height 0.5s ease-out; 
-    }
-
-    /* ৫. জলস্তর টেক্সট স্টাইল */
-    .water-level-text {
-        position: absolute;
-        right: 45px; /* বারের বাম দিকে রাখার জন্য */
-        transform: translateY(50%); /* উল্লম্বভাবে মাঝখানে ধরে রাখতে */
-        color: #000;
-        font-size: 0.8em; /* ফন্ট সাইজ সামান্য বাড়ানো হলো */
-        font-weight: bold;
-        z-index: 10;
-        text-shadow: 0 0 2px #fff;
-    }
-    /* ৬. জোয়ার-ভাটার আইকন (ওয়েভ SVG) */
     .tide-icon-svg {
         display: inline-block;
         width: 24px;
@@ -207,32 +228,26 @@
         }catch(e){ return '—'; }
     }
 
-    function parseBengaliTime(timeStr,dateContext){
-        try{
-            const parts=timeStr.split(' ');
-            if(parts.length!==2) return null;
-            const [timePart,ampm]=parts;
-            let [h,m]=timePart.split(':').map(Number);
-            if(ampm==='PM'&&h!==12) h+=12;
-            if(ampm==='AM'&&h===12) h=0;
-            let d=dateContext||new Date();
-            d.setHours(h,m,0,0);
-            return d;
-        }catch(e){ return null; }
-    }
-
     function createWaveSVG(){
         const ns='http://www.w3.org/2000/svg';
         const svg=document.createElementNS(ns,'svg');
-        svg.setAttribute('width','24'); svg.setAttribute('height','24'); svg.setAttribute('viewBox','0 0 24 24');
-        const style=document.createElementNS(ns,'style');
-        style.textContent=`
-            .wave{fill:none;stroke:#FFF;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;animation:wave-motion 2s linear infinite alternate;}
-            @keyframes wave-motion{0%{transform:translateY(0px);}100%{transform:translateY(-2px);}}
-        `;
-        svg.appendChild(style);
-        const p1=document.createElementNS(ns,'path'); p1.setAttribute('class','wave'); p1.setAttribute('d','M2 12s2-2 4-2 4 2 4 2 2-2 4-2 4 2 4 2'); svg.appendChild(p1);
-        const p2=document.createElementNS(ns,'path'); p2.setAttribute('class','wave'); p2.setAttribute('d','M2 16s2-2 4-2 4 2 4 2 2-2 4-2 4 2 4 2'); p2.style.animationDelay='-1s'; svg.appendChild(p2);
+        // viewBox পরিবর্তন করা হয়েছে যাতে wave অ্যানিমেশনটি সঠিকভাবে দেখা যায়
+        svg.setAttribute('width','24'); 
+        svg.setAttribute('height','24'); 
+        svg.setAttribute('viewBox','0 0 24 24'); 
+        
+        // CSS এখন <style> ট্যাগের মধ্যে আছে, তাই এখানে শুধু path যোগ করা হলো
+        const p1=document.createElementNS(ns,'path'); 
+        p1.setAttribute('class','wave'); 
+        p1.setAttribute('d','M2 12s2-2 4-2 4 2 4 2 2-2 4-2 4 2 4 2'); 
+        svg.appendChild(p1);
+        
+        const p2=document.createElementNS(ns,'path'); 
+        p2.setAttribute('class','wave'); 
+        p2.setAttribute('d','M2 16s2-2 4-2 4 2 4 2 2-2 4-2 4 2 4 2'); 
+        p2.style.animationDelay='-1s'; 
+        svg.appendChild(p2);
+        
         return svg.outerHTML;
     }
 
@@ -251,7 +266,6 @@
             const [h,m]=baseTime.split(':').map(Number);
             base=new Date(d.getFullYear(),d.getMonth(),d.getDate(),h,m,0);
         }
-        // জোয়ার-ভাটার চক্র প্রায় 6 ঘন্টা 12 মিনিট
         const gap=(6*60+12)*60000;
         const out=[];
         const types=['উচ্চ জোয়ার','নিম্ন ভাটা','উচ্চ জোয়ার','নিম্ন ভাটা'];
@@ -267,20 +281,17 @@
         const now=Date.now();
         let past=null,next=null,index=-1;
 
-        // Find the past and next tide events
         for(let i=0;i<tides.length;i++){
             if(tides[i].timestamp<=now){ past=tides[i]; next=tides[i+1]; index=i+1; }
             else if(!next){ next=tides[i]; index=i; }
         }
 
         if(!next){
-            // If the last event has passed, wrap to the first event of the day
             next=tides[0];
             past=tides[tides.length-1];
             index=0;
         }
-        
-        // Use full range for calculation (5% to 95%)
+
         const start=past&&past.level==='high'?95:5;
         const end=next&&next.level==='high'?95:5;
 
@@ -290,12 +301,11 @@
         if(past && next && next.timestamp>past.timestamp){
             const total=next.timestamp-past.timestamp;
             const done=now-past.timestamp;
-            // Linear interpolation of water level
             lvl=start + ((end-start)*(done/total));
             dir=end>start?'up':'down';
         }
 
-        lvl=Math.max(5,Math.min(95,lvl)); // Keep level within bounds 5-95%
+        lvl=Math.max(5,Math.min(95,lvl)); 
         return { level:Math.round(lvl), direction:dir, nextEventIndex:index };
     }
 
@@ -332,26 +342,27 @@
     function updateLiveUI(){
         if(!STATE.tides.length) return;
         
-        $('local-time-live').textContent=formatToBengali(new Date(),true,true);
+        const currentTime=new Date();
+        $('local-time-live').textContent=formatToBengali(currentTime,true,true);
         
-        const {level,direction}=getDynamicLevelInfo(STATE.tides);
+        const dynInfo=getDynamicLevelInfo(STATE.tides);
+        const {level,direction}=dynInfo;
         
-        // জলস্তর আপডেট
+        // জলস্তর আপডেট (CSS এ transition যোগ করা হয়েছে)
         $('water-fill').style.height=level+"%";
         
-        // জলস্তর টেক্সট আপডেট
+        // জলস্তর টেক্সট আপডেট (ডাইনামিক পজিশন)
         $('water-level-text').textContent=level+"%";
-        $('water-level-text').style.bottom=level+"%"; // <--- **গুরুত্বপূর্ণ সংশোধন:** জলস্তরের সাথে % লেখাটি ওঠানামা করবে
+        $('water-level-text').style.bottom=`calc(${level}% - 0.7em)`; // 0.7em বিয়োগ করা হলো যাতে % লেখাটি বারের মাঝখানে থাকে
 
         // জোয়ার-ভাটা তালিকা আপডেট
-        $('tide-events-list').innerHTML=buildTideList(STATE.tides,getDynamicLevelInfo(STATE.tides));
+        $('tide-events-list').innerHTML=buildTideList(STATE.tides,dynInfo);
         
         // তীরচিহ্ন আপডেট
         $('panel-arrow-indicator').innerHTML=direction!=='static'?createGlowArrow(direction,'1.4em'):'';
     }
 
     function buildWidget(data){
-        const cur=formatToBengali(new Date(),false);
         const dyn=getDynamicLevelInfo(data.tides);
         const arrow=dyn.direction!=='static'?createGlowArrow(dyn.direction,'1.4em'):'';
         const currentTime=new Date();
@@ -360,13 +371,15 @@
         
         return `
         <div class="tide-panel">
+            
             <div class="level-indicator-container">
-                <div id="water-level-text" class="water-level-text" style="bottom:${dyn.level}%;">${dyn.level}%</div>
+                <div id="water-level-text" class="water-level-text" 
+                     style="bottom:calc(${dyn.level}% - 0.7em);">${dyn.level}%</div>
                 <div class="level-indicator-bar">
                     <div id="water-fill" class="water-fill" style="height:${dyn.level}%"></div>
                 </div>
             </div>
-            
+
             <div class="tide-content">
                 <div class="tide-header-section">
                     <div class="tide-header-title">জোয়ার-ভাটা</div>
@@ -375,6 +388,7 @@
                     </div>
                 </div>
                 <div class="tide-events-list" id="tide-events-list">${buildTideList(data.tides,dyn)}</div>
+                
                 <div class="footer-tags-section">
                     <div class="tide-date-footer">আজ: ${currentDate}</div>
                     <div class="location-time-tag">
@@ -401,7 +415,7 @@
 
         STATE.tides=approxTides(moon);
 
-        // বিল্ড উইজেট ফাংশন কল করার সময় জলস্তর বারটি ডানদিকে নিয়ে আসা হলো
+        // বিল্ড উইজেট ফাংশন কল করা হলো
         $('madhabam-tide-widget').innerHTML=buildWidget(STATE);
 
         if(updateUIInterval) clearInterval(updateUIInterval);
