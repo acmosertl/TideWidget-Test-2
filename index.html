@@ -20,14 +20,15 @@
         padding: 0;
     }
 
-    /* ২. ওয়েভ অ্যানিমেশন স্টাইল */
+    /* ২. ওয়েভ অ্যানিমেশন স্টাইল (অ্যানিমেশন ফিক্স) */
     .wave{
         fill:none;
         stroke:#FFF;
         stroke-width:2;
         stroke-linecap:round;
         stroke-linejoin:round;
-        animation:wave-motion 2s linear infinite alternate;
+        /* অ্যানিমেশনটি সক্রিয় করা হলো */
+        animation:wave-motion 2s linear infinite alternate; 
     }
     @keyframes wave-motion{
         0%{transform:translateY(0px);}
@@ -86,7 +87,7 @@
         z-index: 10;
         text-shadow: 0 0 2px #fff;
         transform: translateY(50%); 
-        transition: bottom 0.5s ease-out; 
+        transition: bottom 0.5s ease-out; /* স্মুথ মুভমেন্ট */
     }
 
     /* ৬. বাম কন্টেন্ট স্টাইল */
@@ -170,7 +171,7 @@
         margin-left: 10px; 
     }
 
-    /* ৮. ফুটার স্টাইল (গুরুত্বপূর্ণ ফিক্স) */
+    /* ৮. ফুটার স্টাইল */
     .footer-tags-section {
         margin-top: 15px;
         font-size: 0.85em;
@@ -282,68 +283,68 @@
         return out.sort((a,b)=>a.timestamp-b.timestamp);
     }
 
+    // --- ডাইনামিক লজিক সংশোধন (সবথেকে গুরুত্বপূর্ণ ফিক্স) ---
     function getDynamicLevelInfo(tides){
         if(!tides||!tides.length) return {level:50,direction:'static',nextEventIndex:-1};
         const now=Date.now();
-        let past=null,next=null,index=-1;
+        
+        let index = -1;
+        // Find the index of the *first* tide event that is yet to come
+        index = tides.findIndex(t => t.timestamp > now);
 
-        for(let i=0;i<tides.length;i++){
-            if(tides[i].timestamp<=now){ past=tides[i]; next=tides[i+1]; index=i+1; }
-            else if(!next){ next=tides[i]; index=i; }
-        }
-
-        if(!next){
-            // If the last event has passed, wrap to the first event of the next period (approx a day later)
-            // For a simpler widget, let's wrap to the first event of the current list if all have passed
-            if(tides[tides.length-1].timestamp < now){
-                past = tides[tides.length-1];
-                const nextTides = approxTides(new Date(past.timestamp + (6*60+12)*60000)); // Approx next tide
-                if (nextTides.length > 0) {
-                    next = nextTides[0];
-                    // We need a way to reliably calculate the *next* next event's time, not just the next one on the list
-                    // For now, let's keep the simple logic and ensure correct indexing
-                }
-            } else {
-                next = tides[0];
-                past = tides[tides.length-1];
-                index = 0;
+        let past = null;
+        let next = null;
+        
+        if (index === -1) {
+            // Case 1: All events have passed for the day. Highlight the first event (tomorrow's start)
+            // Use the last event of the day as the 'past' anchor
+            past = tides[tides.length - 1];
+            // Set 'next' anchor as the first event, but shifted to the next day
+            const nextDayTime = new Date(tides[0].timestamp);
+            nextDayTime.setDate(nextDayTime.getDate() + 1);
+            next = { ...tides[0], timestamp: nextDayTime.getTime() };
+            index = 0; // Highlight the first one for the next cycle
+        } else {
+            // Case 2: We found the next upcoming event at 'index'
+            next = tides[index];
+            // The 'past' anchor is the one right before it
+            past = tides[index - 1] || null;
+            // Handle the transition from the end of one day to the start of the next (when index is 0)
+            if (index === 0) {
+                 // Simulate past event from previous day for accurate calculation
+                 const previousDayTime = new Date(tides[tides.length - 1].timestamp);
+                 previousDayTime.setDate(previousDayTime.getDate() - 1);
+                 past = { ...tides[tides.length - 1], timestamp: previousDayTime.getTime() };
             }
         }
         
-        // Correct next event index determination:
-        // Find the *first* event that is later than "now"
-        index = tides.findIndex(t => t.timestamp > now);
-        if (index === -1) {
-            // If all passed, highlight the first one (for the next day)
-            index = 0;
-            past = tides[tides.length-1];
-            // Simulate next event being tomorrow for calculation
-            const nextDayTide = new Date(tides[0].timestamp);
-            nextDayTide.setDate(nextDayTide.getDate() + 1);
-            next = { ...tides[0], timestamp: nextDayTide.getTime() };
-        } else {
-            // Find the last event that is earlier than "now"
-            past = tides[index - 1] || null;
-            next = tides[index];
-        }
-        
+        // Default level if past/next anchors are still null (shouldn't happen with the logic above)
+        if (!past || !next) return {level:50, direction:'static', nextEventIndex: index };
 
-        const start=past&&past.level==='high'?95:5;
-        const end=next&&next.level==='high'?95:5;
+        // Calculate start and end water levels (using 5% to 95% range for visual effect)
+        const start=past.level==='high'?95:5;
+        const end=next.level==='high'?95:5;
 
         let lvl=50;
         let dir='static';
 
-        if(past && next && next.timestamp>past.timestamp){
+        // Linear interpolation for current level
+        if(next.timestamp>past.timestamp){
             const total=next.timestamp-past.timestamp;
             const done=now-past.timestamp;
-            lvl=start + ((end-start)*(done/total));
+            
+            // Percentage of the cycle completed
+            let ratio = done / total;
+            ratio = Math.max(0, Math.min(1, ratio)); // Clamp between 0 and 1
+
+            lvl=start + ((end-start)*ratio);
             dir=end>start?'up':'down';
         }
 
-        lvl=Math.max(5,Math.min(95,lvl)); 
-        return { level:Math.round(lvl), direction:dir, nextEventIndex:index };
+        lvl=Math.round(Math.max(5,Math.min(95,lvl))); // Keep level within bounds 5-95%
+        return { level:lvl, direction:dir, nextEventIndex:index };
     }
+    // --- ডাইনামিক লজিক সংশোধন সমাপ্ত ---
 
 
     function loadCoordinates(){
@@ -385,17 +386,18 @@
         const dynInfo=getDynamicLevelInfo(STATE.tides);
         const {level,direction}=dynInfo;
         
-        // জলস্তর আপডেট (ডাইনামিক)
+        // ১. জলস্তর আপডেট (গতিশীল)
         $('water-fill').style.height=level+"%";
         
-        // জলস্তর টেক্সট আপডেট (গুরুত্বপূর্ণ ফিক্স)
+        // ২. জলস্তর টেক্সট আপডেট (গতিশীল পজিশন)
         $('water-level-text').textContent=level+"%";
         $('water-level-text').style.bottom=`calc(${level}% - 8px)`; 
 
-        // জোয়ার-ভাটা তালিকা আপডেট (ডাইনামিক হাইলাইট)
+        // ৩. জোয়ার-ভাটা তালিকা আপডেট (ডাইনামিক হাইলাইট ও ইন্ডিকেটর)
+        // প্রতিবার UI আপডেটে লিস্ট রিবিল্ড করা হচ্ছে
         $('tide-events-list').innerHTML=buildTideList(STATE.tides,dynInfo);
         
-        // তীরচিহ্ন আপডেট (ডাইনামিক ইন্ডিকেটর)
+        // ৪. উপরের তীরচিহ্ন আপডেট 
         $('panel-arrow-indicator').innerHTML=direction!=='static'?createGlowArrow(direction,'1.4em'):'';
     }
 
@@ -443,7 +445,6 @@
 
         let moon=null;
         try{
-            // Open-Meteo API call is prone to failure, adding robust error handling
             const r=await fetch(API_OM+`?latitude=${STATE.lat}&longitude=${STATE.lng}&daily=moonrise&timezone=auto`);
             if (!r.ok) throw new Error("API not OK");
             const j=await r.json();
@@ -455,14 +456,14 @@
 
         STATE.tides=approxTides(moon);
 
-        // বিল্ড উইজেট ফাংশন কল করা হলো
         $('madhabam-tide-widget').innerHTML=buildWidget(STATE);
 
         if(updateUIInterval) clearInterval(updateUIInterval);
-        updateUIInterval=setInterval(updateLiveUI,100);
+        // প্রতি 100 মিলিসেকেন্ডে UI আপডেট হবে, ফলে জলস্তর এবং ইন্ডিকেটর গতিশীল লাগবে।
+        updateUIInterval=setInterval(updateLiveUI,100); 
         
         if(updateDataInterval) clearInterval(updateDataInterval);
-        updateDataInterval=setInterval(loadAllData,1800000); // 30 minutes interval
+        updateDataInterval=setInterval(loadAllData,1800000); 
     }
 
     loadAllData();
