@@ -18,6 +18,146 @@
         margin: 0 auto;
         padding: 10px;
     }
+
+    /* >>> স্টাইল পরিবর্তন শুরু <<< */
+    .tide-panel {
+        display: flex;
+        background-color: #00575e; /* উইজেটের ব্যাকগ্রাউন্ড */
+        border-radius: 15px; /* কোণগুলি গোল করার জন্য */
+        padding: 15px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        color: #fff;
+    }
+
+    .tide-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding-right: 15px;
+    }
+
+    .tide-header-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        margin-bottom: 15px;
+        font-weight: bold;
+    }
+
+    .tide-header-title {
+        font-size: 1.5em; 
+        color: #f7d730; 
+    }
+
+    .tide-events-list {
+        flex-grow: 1;
+    }
+
+    .tide-item-compact {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px dotted rgba(255, 255, 255, 0.2);
+    }
+    .tide-item-compact:last-child {
+        border-bottom: none;
+    }
+
+    .tide-label-group {
+        display: flex;
+        align-items: center;
+    }
+
+    .tide-text-stack {
+        display: flex;
+        flex-direction: column;
+        margin-left: 10px;
+    }
+
+    .tide-type-value {
+        font-size: 1em;
+        font-weight: bold;
+        color: #ffffff;
+    }
+
+    .tide-time-value {
+        font-size: 1.1em;
+        font-weight: bold;
+        color: #f7d730;
+    }
+    
+    .highlight .tide-type-value {
+        color: #fff;
+        background-color: rgba(255, 255, 255, 0.2);
+        padding: 2px 4px;
+        border-radius: 4px;
+        display: inline-block;
+    }
+    .highlight .tide-time-value {
+        color: #f7d730; /* সময় হাইলাইট এর জন্য আগের রঙই রাখলাম */
+    }
+
+
+    /* ফুটার স্টাইল */
+    .footer-tags-section {
+        margin-top: 15px;
+        font-size: 0.85em;
+    }
+    .tide-date-footer {
+        margin-bottom: 5px;
+    }
+    .location-time-tag span {
+        color: #f7d730;
+    }
+    
+    /* জলস্তর বার স্টাইল */
+    .level-indicator-container {
+        width: 40px;
+        display: flex;
+        align-items: flex-end;
+    }
+
+    .level-indicator-bar {
+        width: 25px;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .water-fill {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background: linear-gradient(to top, #36aee0, #7ec0ee); 
+        transition: height 0.5s ease-out; 
+    }
+
+    .water-level-text {
+        position: absolute;
+        bottom: 50%;
+        left: 50%;
+        transform: translate(-50%, 50%);
+        color: #000;
+        font-size: 0.7em;
+        font-weight: bold;
+        z-index: 10;
+        text-shadow: 0 0 2px #fff;
+    }
+
+    /* জোয়ার-ভাটার আইকন (ওয়েভ SVG) */
+    .tide-icon-svg {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        margin-right: 5px;
+    }
+    
+    /* >>> স্টাইল পরিবর্তন শেষ <<< */
 </style>
 </head>
 
@@ -187,12 +327,11 @@
         const cur=formatToBengali(new Date(),false);
         const dyn=getDynamicLevelInfo(data.tides);
         const arrow=dyn.direction!=='static'?createGlowArrow(dyn.direction,'1.4em'):'';
+        const currentTime=new Date();
+        const currentBengaliTime=formatToBengali(currentTime,true,true);
+        const currentDate=formatToBengali(currentTime,false);
 
         return `
-        <style>
-        ${document.querySelector("style").innerHTML}
-        </style>
-
         <div class="tide-panel">
             <div class="tide-content">
                 <div class="tide-header-section">
@@ -203,10 +342,10 @@
                 </div>
                 <div class="tide-events-list" id="tide-events-list">${buildTideList(data.tides,dyn)}</div>
                 <div class="footer-tags-section">
-                    <div class="tide-date-footer">আজ: ${cur}</div>
+                    <div class="tide-date-footer">আজ: ${currentDate}</div>
                     <div class="location-time-tag">
-                        স্থান: <span>${data.city}</span> | সময়:
-                        <span id="local-time-live">${formatToBengali(new Date(),true,true)}</span>
+                        স্থান: <span>${data.city}</span> | স্থানীয় সময়:
+                        <span id="local-time-live">${currentBengaliTime}</span>
                     </div>
                 </div>
             </div>
@@ -234,9 +373,15 @@
 
         STATE.tides=approxTides(moon);
 
+        // বিল্ড উইজেট ফাংশন কল করার আগে নিশ্চিত করুন যে সমস্ত ডেটা লোড হয়েছে
         $('madhabam-tide-widget').innerHTML=buildWidget(STATE);
 
+        // উইজেট তৈরি হওয়ার পরে লাইভ আপডেট শুরু করুন
+        if(updateUIInterval) clearInterval(updateUIInterval);
         updateUIInterval=setInterval(updateLiveUI,100);
+        
+        // ডেটা আপডেট (30 মিনিট পর পর)
+        if(updateDataInterval) clearInterval(updateDataInterval);
         updateDataInterval=setInterval(loadAllData,1800000);
     }
 
