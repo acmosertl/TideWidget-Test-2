@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Madhabam Tide Widget</title>
+
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+        background: #00575e;
+        font-family: sans-serif;
+        color: white;
+    }
+    #madhabam-tide-widget {
+        max-width: 360px;
+        margin: 0 auto;
+        padding: 10px;
+    }
+</style>
+</head>
+
+<body>
+
+<!-- তোমার মূল widget container -->
+<div id="madhabam-tide-widget" style="max-width:300px;"></div>
+
+<!-- তোমার সম্পূর্ণ কোড নিচে হুবহু বসানো হলো -->
+<script>
+/* TIDE WIDGET - STANDALONE (Final Compact Dynamic UI - Responsiveness Fixed) */
+(function(){
+    // API Endpoints and Default Location (Kolkata)
+    const API_OM = 'https://api.open-meteo.com/v1/forecast';
+    const API_IP = 'https://ipapi.co/json/';
+    const DEFAULT = { lat:22.57, lng:88.36, source:'স্থির স্থানাঙ্ক', city:'কলকাতা' };
+    const $ = id => document.getElementById(id);
+
+    const FALLBACK_DATA = { tide_anchor_fallback: '20:30' };
+
+    let STATE = { lat: DEFAULT.lat, lng: DEFAULT.lng, source: DEFAULT.source, city: DEFAULT.city, tides:[] };
+    let updateUIInterval = null; 
+    let updateDataInterval = null; 
+
+    function formatToBengali(dateInput, isTime = false, showSeconds = false) {
+        if (!dateInput) return '—';
+        try {
+            const date = (dateInput instanceof Date) ? dateInput : new Date(dateInput);
+            if (isNaN(date)) return '—';
+            const options = { timeZone: 'Asia/Kolkata' };
+            if (isTime) {
+                options.hour = '2-digit'; 
+                options.minute = '2-digit';
+                if (showSeconds) options.second = '2-digit'; 
+                options.hour12 = true;
+                return date.toLocaleTimeString('bn-BD', options);
+            }
+            options.day = '2-digit';
+            options.month = '2-digit';
+            options.year = 'numeric';
+            return date.toLocaleDateString('bn-BD', options).replace(/\//g, '-');
+        } catch (e) { return '—'; }
+    }
+
+    function parseBengaliTime(timeStr, dateContext) {
+        try {
+            const parts = timeStr.split(' ');
+            if (parts.length !== 2) return null;
+            const [timePart, ampm] = parts;
+            let [h, m] = timePart.split(':').map(Number);
+            if (ampm === 'PM' && h !== 12) h += 12;
+            if (ampm === 'AM' && h === 12) h = 0;
+            let date = dateContext || new Date();
+            date.setHours(h, m, 0, 0);
+            return date;
+        } catch (e) { return null; }
+    }
+
+    function createWaveSVG() {
+        const ns = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(ns, 'svg');
+        svg.setAttribute('width', '24'); 
+        svg.setAttribute('height', '24'); 
+        svg.setAttribute('viewBox', '0 0 24 24');
+
+        const style = document.createElementNS(ns, 'style');
+        style.textContent = `
+            .wave { fill: none; stroke: #FFF; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; animation: wave-motion 2s linear infinite alternate; }
+            @keyframes wave-motion { 0% { transform: translateY(0px); } 100% { transform: translateY(-2px); } }
+        `;
+        svg.appendChild(style);
+
+        const path1 = document.createElementNS(ns, 'path');
+        path1.setAttribute('class', 'wave');
+        path1.setAttribute('d', 'M2 12s2-2 4-2 4 2 4 2 2-2 4-2 4 2 4 2');
+        svg.appendChild(path1);
+
+        const path2 = document.createElementNS(ns, 'path');
+        path2.setAttribute('class', 'wave');
+        path2.setAttribute('d', 'M2 16s2-2 4-2 4 2 4 2 2-2 4-2 4 2 4 2');
+        path2.style.animationDelay = '-1s';
+        svg.appendChild(path2);
+
+        return svg.outerHTML;
+    }
+
+    function createGlowArrow(direction, size = '1.1em') {
+        const arrow = direction === 'up' ? '▲' : '▼';
+        const color = direction === 'up' ? '#32CD32' : '#FF4500';
+        const shadow = `0 0 5px ${color}, 0 0 10px ${color}`;
+        return `<span style="font-size:${size};color:${color};text-shadow:${shadow};margin-left:5px;position:relative;top:${direction==='up'?' -2px':' 2px'};">${arrow}</span>`;
+    }
+
+    function approxTides(baseTime){
+        let base = new Date();
+        if(baseTime && baseTime.includes('T')) base = new Date(baseTime);
+        else if(baseTime) { 
+            const d=new Date(); 
+            const [h, m] = baseTime.split(':').map(Number);
+            base = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m, 0);
+        }
+        const gap = (6*60+12)*60000;
+        const out = [];
+        const types = ['উচ্চ জোয়ার','নিম্ন ভাটা','উচ্চ জোয়ার','নিম্ন ভাটা'];
+        for(let i=0;i<4;i++){
+            let t = new Date(base.getTime()+i*gap);
+            out.push({ type:types[i], time:formatToBengali(t,true), level:(i%2===0)?'high':'low', timestamp:t.getTime() });
+        }
+        return out.sort((a,b)=>a.timestamp-b.timestamp);
+    }
+
+    function getDynamicLevelInfo(tides){
+        if(!tides||tides.length===0) return {level:50,direction:'static',nextEventIndex:-1};
+        const now = new Date().getTime();
+        let past=null, next=null, nextIndex=-1;
+
+        for(let i=0;i<tides.length;i++){
+            if(tides[i].timestamp<=now){
+                past=tides[i];
+                next=tides[i+1];
+                nextIndex=i+1;
+            } else if(!next){
+                next=tides[i];
+                nextIndex=i;
+            }
+        }
+        if(!next){
+            next=tides[0];
+            past=tides[tides.length-1];
+            nextIndex=0;
+        }
+
+        const start = past && past.level==='high'?95:5;
+        const end   = next && next.level==='high'?95:5;
+
+        let lvl=50;
+        let dir='static';
+
+        if(past && next && next.timestamp>past.timestamp){
+            const total  = next.timestamp-past.timestamp;
+            const passed = now-past.timestamp;
+            lvl = start + ((end-start)*(passed/total));
+            dir = end>start?'up':'down';
+        }
+
+        lvl = Math.max(5,Math.min(95,lvl));
+
+        return { level:Math.round(lvl), direction:dir, nextEventIndex:nextIndex };
+    }
+
+    function loadCoordinates(){
+        return fetch(API_IP).then(r=>r.json()).then(j=>{
+            return {
+                lat:j.latitude||DEFAULT.lat,
+                lng:j.longitude||DEFAULT.lng,
+                source:'IP API',
+                city:j.city||DEFAULT.city
+            };
+        }).catch(_=>DEFAULT);
+    }
+
+    function buildTideList(tides,info){
+        let html='';
+        tides.forEach((t,i)=>{
+            const hi = (i===info.nextEventIndex);
+            const ar = hi?createGlowArrow(info.direction):'';
+            html+=`
+                <div class="tide-item-compact ${hi?'highlight':''}">
+                    <span class="tide-label-group">
+                        <div class="tide-icon-svg">${createWaveSVG()}</div>
+                        <div class="tide-text-stack">
+                            <span class="tide-type-value">${t.type}${ar}</span>
+                            <span class="tide-time-value">${t.time}</span>
+                        </div>
+                    </span>
+                </div>`;
+        });
+        return html;
+    }
+
+    function buildWidget(data){
+        const cur = formatToBengali(new Date(),false);
+        const dyn = getDynamicLevelInfo(data.tides);
+        const arrow = dyn.direction!=='static'?createGlowArrow(dyn.direction,'1.4em'):'';
+
+        const css = `YOUR CSS BLOCK EXACT AS SENT`;
+
+        return css + `
+        <div class="tide-panel">
+            <div class="tide-content">
+                <div class="tide-header-section">
+                    <div class="tide-header-title">জোয়ার-ভাটা</div>
+                    <div style="text-align:right">
+                        <span id="panel-arrow-indicator">${arrow}</span><br>
+                        <span style="font-size:0.7em;">বর্তমান জলস্তর</span>
+                    </div>
+                </div>
+                <div class="tide-events-list" id="tide-events-list">${buildTideList(data.tides,dyn)}</div>
+                <div class="footer-tags-section">
+                    আজ: ${cur}<br>
+                    স্থান: <span>${data.city}</span> | সময়: 
+                    <span id="local-time-live">${formatToBengali(new Date(),true,true)}</span>
+                </div>
+            </div>
+            <div class="level-indicator-container">
+                <div class="level-indicator-bar">
+                    <div id="water-level-text" class="water-level-text">${dyn.level}%</div>
+                    <div id="water-fill" class="water-fill" style="height:${dyn.level}%"></div>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    async function loadAllData(){
+        const loc = await loadCoordinates();
+        STATE.lat=loc.lat; STATE.lng=loc.lng; STATE.city=loc.city;
+
+        let moon=null;
+        try{
+            const r=await fetch(API_OM+`?latitude=${STATE.lat}&longitude=${STATE.lng}&daily=moonrise&timezone=auto`);
+            const j=await r.json();
+            moon=(j.daily&&j.daily.moonrise&&j.daily.moonrise[0])?j.daily.moonrise[0]:FALLBACK_DATA.tide_anchor_fallback;
+        }catch(e){
+            moon=FALLBACK_DATA.tide_anchor_fallback;
+        }
+
+        STATE.tides=approxTides(moon);
+
+        $('madhabam-tide-widget').innerHTML=buildWidget(STATE);
+
+        setInterval(()=>{
+            if(!STATE.tides.length) return;
+            $('local-time-live').textContent=formatToBengali(new Date(),true,true);
+            const dyn=getDynamicLevelInfo(STATE.tides);
+            $('water-fill').style.height=dyn.level+"%";
+            $('water-level-text').textContent=dyn.level+"%";
+            $('tide-events-list').innerHTML=buildTideList(STATE.tides,dyn);
+            $('panel-arrow-indicator').innerHTML = dyn.direction!=='static'?createGlowArrow(dyn.direction,'1.4em'):'';
+        },100);
+    }
+
+    loadAllData();
+
+})();
+</script>
+
+</body>
+</html>
