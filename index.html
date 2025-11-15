@@ -1,3 +1,226 @@
+<script>
+(function(){
+    const API_OM = 'https://api.open-meteo.com/v1/forecast';
+    const API_IP = 'https://ipapi.co/json/';
+    const DEFAULT = { lat:22.57, lng:88.36, source:'স্থির স্থানাঙ্ক', city:'কলকাতা' };
+    const $ = id => document.getElementById(id);
+
+    const FALLBACK_DATA = { tide_anchor_fallback:'20:30' };
+
+    let STATE = { lat:DEFAULT.lat, lng:DEFAULT.lng, source:DEFAULT.source, city:DEFAULT.city, tides:[] };
+    let updateUIInterval = null;
+    let updateDataInterval = null;
+
+    function formatToBengali(dateInput, isTime=false, showSeconds=false){
+        if(!dateInput) return '—';
+        try{
+            const date = (dateInput instanceof Date)?dateInput:new Date(dateInput);
+            if(isNaN(date)) return '—';
+            const opt={ timeZone:'Asia/Kolkata' }; 
+            if(isTime){
+                opt.hour='2-digit'; opt.minute='2-digit';
+                if(showSeconds) opt.second='2-digit';
+                opt.hour12=true;
+                return date.toLocaleTimeString('bn-BD',opt);
+            }
+            opt.day='2-digit'; opt.month='2-digit'; opt.year='numeric';
+            return date.toLocaleDateString('bn-BD',opt).replace(/\//g,'-');
+        }catch(e){ return '—'; }
+    }
+
+    function createWaveSVG(){
+        const ns='http://www.w3.org/2000/svg';
+        const svg=document.createElementNS(ns,'svg');
+        svg.setAttribute('width','24'); 
+        svg.setAttribute('height','24'); 
+        svg.setAttribute('viewBox','0 0 24 24'); 
+        
+        const p1=document.createElementNS(ns,'path'); 
+        p1.setAttribute('class','wave'); 
+        p1.setAttribute('d','M2 12s2-2 4-2 4 2 4 2 2-2 4-2 4 2 4 2'); 
+        svg.appendChild(p1);
+        
+        const p2=document.createElementNS(ns,'path'); 
+        p2.setAttribute('class','wave'); 
+        p2.setAttribute('d','M2 16s2-2 4-2 4 2 4 2 2-2 4-2 4 2 4 2'); 
+        p2.style.animationDelay='-1s'; 
+        svg.appendChild(p2);
+        
+        return svg.outerHTML;
+    }
+
+    function createGlowArrow(direction,size='1.1em'){
+        const arrow=direction==='up'?'▲':'▼';
+        const color=direction==='up'?'#32CD32':'#FF4500';
+        const shadow=`0 0 5px ${color},0 0 10px ${color}`; 
+        return `<span style="font-size:${size};color:${color};text-shadow:${shadow};margin-left:5px;position:relative;top:${direction==='up'?'-2px':'2px'};">${arrow}</span>`;
+    }
+
+    function approxTides(baseTime){
+        let base=new Date();
+        if(baseTime && baseTime.includes('T')) base=new Date(baseTime);
+        else if(baseTime){
+            const d=new Date();
+            const [h,m]=baseTime.split(':').map(Number);
+            base=new Date(d.getFullYear(),d.getMonth(),d.getDate(),h,m,0);
+        }
+        const gap=(6*60+12)*60000; 
+        const out=[];
+        const types=['উচ্চ জোয়ার','নিম্ন ভাটা','উচ্চ জোয়ার','নিম্ন ভাটা'];
+        for(let i=0;i<4;i++){
+            let t=new Date(base.getTime()+i*gap);
+            out.push({ type:types[i], time:formatToBengali(t,true), level:(i%2===0)?'high':'low', timestamp:t.getTime() });
+        }
+        return out.sort((a,b)=>a.timestamp-b.timestamp);
+    }
+
+    function getDynamicLevelInfo(tides){
+        if(!tides || tides.length < 2) return {level:50,direction:'static',nextEventIndex:-1};
+        const now=Date.now();
+        
+        let nextIndex = tides.findIndex(t => t.timestamp > now);
+        
+        let past = null;
+        let next = null;
+        
+        if (nextIndex === -1) {
+            past = tides[tides.length - 1];
+            const nextDayTime = new Date(tides[0].timestamp);
+            nextDayTime.setDate(nextDayTime.getDate() + 1);
+            next = { ...tides[0], timestamp: nextDayTime.getTime() };
+            nextIndex = 0; 
+        } else {
+            next = tides[nextIndex];
+            if (nextIndex > 0) {
+                past = tides[nextIndex - 1];
+            } else {
+                const previousDayTime = new Date(tides[tides.length - 1].timestamp);
+                previousDayTime.setDate(previousDayTime.getDate() - 1);
+                past = { ...tides[tides.length - 1], timestamp: previousDayTime.getTime() };
+            }
+        }
+        
+        if (!past || !next || next.timestamp <= past.timestamp) {
+             return {level:50, direction:'static', nextEventIndex: nextIndex };
+        }
+
+        const startLevel = past.level === 'high' ? 95 : 5;
+        const endLevel = next.level === 'high' ? 95 : 5;
+
+        let level = 50;
+        let direction = 'static';
+
+        const totalDuration = next.timestamp - past.timestamp;
+        const elapsedDuration = now - past.timestamp;
+        
+        let ratio = elapsedDuration / totalDuration;
+        ratio = Math.max(0, Math.min(1, ratio));
+
+        level = startLevel + ((endLevel - startLevel) * ratio);
+        direction = endLevel > startLevel ? 'up' : 'down';
+
+        level = Math.round(Math.max(5, Math.min(95, level))); 
+        
+        return { level:level, direction:direction, nextEventIndex:nextIndex };
+    }
+    
+    // --- White Screen ফিক্স এবং ফলব্যাক নিশ্চিত করা হলো ---
+    function loadCoordinates(){
+        return new Promise((resolve) => {
+            const ipFallback = (cityOverride) => {
+                fetch(API_IP).then(r => r.json()).then(j => {
+                    resolve({
+                        lat: j.latitude || DEFAULT.lat,
+                        lng: j.longitude || DEFAULT.lng,
+                        source: 'IP API',
+                        city: cityOverride || j.city || DEFAULT.city 
+                    });
+                }).catch(e => {
+                    console.error("IP API error, using default.", e);
+                    resolve(DEFAULT); 
+                });
+            };
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    // GPS সফল হলে, IP API কল করা হলো শহরের নাম জানতে
+                    fetch(API_IP).then(r => r.json()).then(j => {
+                        resolve({
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                            source: 'GPS',
+                            city: j.city || 'আপনার অবস্থান'
+                        });
+                    }).catch(e => {
+                        console.error("IP API (for city) failed. Using GPS coords.", e);
+                        resolve({
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                            source: 'GPS',
+                            city: 'আপনার অবস্থান'
+                        });
+                    });
+                }, (error) => {
+                    // GPS ব্যর্থ হলে, IP API ফলব্যাক
+                    console.warn("GPS failed, falling back to IP API.", error);
+                    ipFallback();
+                }, {timeout: 8000}); 
+            } else {
+                // ব্রাউজারে GPS সাপোর্ট করে না, IP API ফলব্যাক
+                ipFallback();
+            }
+        });
+    }
+    // --- White Screen ফিক্স সমাপ্ত ---
+
+
+    function buildTideList(tides,info){
+        let html='';
+        tides.forEach((t,i)=>{
+            const hi=i===info.nextEventIndex;
+            const ar=hi?createGlowArrow(info.direction,'0.9em'):''; 
+            html+=`
+            <div class="tide-item-compact ${hi?'highlight':''}">
+                <span class="tide-label-group">
+                    <div class="tide-icon-svg">${createWaveSVG()}</div>
+                    <div class="tide-text-stack">
+                        <span class="tide-type-value">${t.type}${ar}</span>
+                        <span class="tide-time-value">${t.time}</span>
+                    </div>
+                </span>
+            </div>`;
+        });
+        return html;
+    }
+
+    function updateLiveUI(){
+        if(!STATE.tides.length) return;
+        
+        const currentTime=new Date();
+        $('local-time-live').textContent=formatToBengali(currentTime,true,true);
+        
+        const dynInfo=getDynamicLevelInfo(STATE.tides);
+        const {level,direction}=dynInfo;
+        
+        $('water-fill').style.height=level+"%";
+        
+        $('water-level-text').textContent=level+"%";
+        $('water-level-text').style.bottom=`calc(${level}% - 8px)`; 
+
+        $('tide-events-list').innerHTML=buildTideList(STATE.tides,dynInfo);
+        
+        $('panel-arrow-indicator').innerHTML=direction!=='static'?createGlowArrow(direction,'1.4em'):'';
+    }
+
+    function buildWidget(data){
+        const dyn=getDynamicLevelInfo(data.tides);
+        const arrow=dyn.direction!=='static'?createGlowArrow(dyn.direction,'1.4em'):'';
+        const currentTime=new Date();
+        const currentBengaliTime=formatToBengali(currentTime,true,true);
+        const currentDate=formatToBengali(currentTime,false);
+        
+        return `
+        <div class="tide-panel">
             
             <div class="level-indicator-container">
                 <div id="water-level-text" class="water-level-text" 
@@ -9,7 +232,7 @@
 
             <div class="tide-content">
                 <div class="tide-header-section">
-                    <div>
+                    <div class="tide-header-title">জোয়ার-ভাটা</div>
                     <div style="text-align:right;font-size:0.7em;">
                         <span id="panel-arrow-indicator">${arrow}</span><br>বর্তমান জলস্তর
                     </div>
@@ -28,36 +251,46 @@
     }
 
     async function loadAllData(){
-        const coords=await loadCoordinates();
-        STATE.lat=coords.lat; STATE.lng=coords.lng; STATE.city=coords.city;
+        try {
+            const coords=await loadCoordinates();
+            STATE.lat=coords.lat; STATE.lng=coords.lng; STATE.city=coords.city;
+            
+            let moon=FALLBACK_DATA.tide_anchor_fallback; 
+            try{
+                const r=await fetch(API_OM+`?latitude=${STATE.lat}&longitude=${STATE.lng}&daily=moonrise&timezone=auto`);
+                if (!r.ok) throw new Error("API not OK");
+                const j=await r.json();
+                moon=(j.daily&&j.daily.moonrise&&j.daily.moonrise[0])?j.daily.moonrise[0]:FALLBACK_DATA.tide_anchor_fallback;
+            }catch(e){
+                console.error("Tide data API error, using fallback time.", e);
+            }
 
-        let moon=null;
-        try{
-            // Open-Meteo API call for moonrise time (tide anchor)
-            const r=await fetch(API_OM+`?latitude=${STATE.lat}&longitude=${STATE.lng}&daily=moonrise&timezone=auto`);
-            if (!r.ok) throw new Error("API not OK");
-            const j=await r.json();
-            moon=(j.daily&&j.daily.moonrise&&j.daily.moonrise[0])?j.daily.moonrise[0]:FALLBACK_DATA.tide_anchor_fallback;
-        }catch(e){
-            console.error("Tide data API error, using fallback time.", e);
-            moon=FALLBACK_DATA.tide_anchor_fallback;
+            STATE.tides=approxTides(moon);
+            
+            // রেন্ডারিং শুরু করা হলো
+            $('madhabam-tide-widget').innerHTML=buildWidget(STATE);
+
+            // শহর/স্থান নাম আপডেট
+            // document.querySelector('.location-time-tag span').textContent = STATE.city; // এটি এখন buildWidget এ করা হচ্ছে।
+
+            if(updateUIInterval) clearInterval(updateUIInterval);
+            updateUIInterval=setInterval(updateLiveUI,100); 
+            
+            if(updateDataInterval) clearInterval(updateDataInterval);
+            updateDataInterval=setInterval(loadAllData,1800000); 
+
+        } catch (error) {
+            console.error("Critical error during initial load:", error);
+            // মারাত্মক ত্রুটি হলে ফলব্যাক বার্তা
+            $('madhabam-tide-widget').innerHTML = `
+                <div style="background-color: #00575e; color: #f7d730; padding: 15px; border-radius: 10px; font-weight: bold; text-align: center;">
+                    জোয়ার-ভাটার তথ্য লোড হচ্ছে না।
+                </div>
+            `;
         }
-
-        STATE.tides=approxTides(moon);
-        
-        // শহরের নাম আপডেট করা হলো
-        document.querySelector('.location-time-tag span').textContent = STATE.city;
-
-        $('madhabam-tide-widget').innerHTML=buildWidget(STATE);
-
-        if(updateUIInterval) clearInterval(updateUIInterval);
-        updateUIInterval=setInterval(updateLiveUI,100); 
-        
-        if(updateDataInterval) clearInterval(updateDataInterval);
-        // প্রতি 30 মিনিটে ডেটা পুনরায় লোড করা হবে
-        updateDataInterval=setInterval(loadAllData,1800000); 
     }
 
     loadAllData();
 })();
-</script>
+                    </script>
+                    
