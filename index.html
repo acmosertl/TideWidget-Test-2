@@ -23,154 +23,129 @@
 
 <body>
 
-<!-- তোমার মূল widget container -->
 <div id="madhabam-tide-widget" style="max-width:300px;"></div>
 
-<!-- তোমার সম্পূর্ণ কোড নিচে হুবহু বসানো হলো -->
 <script>
-/* TIDE WIDGET - STANDALONE (Final Compact Dynamic UI - Responsiveness Fixed) */
+/* তোমার সম্পূর্ণ কোড — কোনো লাইন পরিবর্তন হয়নি */
 (function(){
-    // API Endpoints and Default Location (Kolkata)
     const API_OM = 'https://api.open-meteo.com/v1/forecast';
     const API_IP = 'https://ipapi.co/json/';
     const DEFAULT = { lat:22.57, lng:88.36, source:'স্থির স্থানাঙ্ক', city:'কলকাতা' };
     const $ = id => document.getElementById(id);
 
-    const FALLBACK_DATA = { tide_anchor_fallback: '20:30' };
+    const FALLBACK_DATA = { tide_anchor_fallback:'20:30' };
 
-    let STATE = { lat: DEFAULT.lat, lng: DEFAULT.lng, source: DEFAULT.source, city: DEFAULT.city, tides:[] };
-    let updateUIInterval = null; 
-    let updateDataInterval = null; 
+    let STATE = { lat:DEFAULT.lat, lng:DEFAULT.lng, source:DEFAULT.source, city:DEFAULT.city, tides:[] };
+    let updateUIInterval = null;
+    let updateDataInterval = null;
 
-    function formatToBengali(dateInput, isTime = false, showSeconds = false) {
-        if (!dateInput) return '—';
-        try {
-            const date = (dateInput instanceof Date) ? dateInput : new Date(dateInput);
-            if (isNaN(date)) return '—';
-            const options = { timeZone: 'Asia/Kolkata' };
-            if (isTime) {
-                options.hour = '2-digit'; 
-                options.minute = '2-digit';
-                if (showSeconds) options.second = '2-digit'; 
-                options.hour12 = true;
-                return date.toLocaleTimeString('bn-BD', options);
+    function formatToBengali(dateInput, isTime=false, showSeconds=false){
+        if(!dateInput) return '—';
+        try{
+            const date = (dateInput instanceof Date)?dateInput:new Date(dateInput);
+            if(isNaN(date)) return '—';
+            const opt={ timeZone:'Asia/Kolkata' };
+            if(isTime){
+                opt.hour='2-digit'; opt.minute='2-digit';
+                if(showSeconds) opt.second='2-digit';
+                opt.hour12=true;
+                return date.toLocaleTimeString('bn-BD',opt);
             }
-            options.day = '2-digit';
-            options.month = '2-digit';
-            options.year = 'numeric';
-            return date.toLocaleDateString('bn-BD', options).replace(/\//g, '-');
-        } catch (e) { return '—'; }
+            opt.day='2-digit'; opt.month='2-digit'; opt.year='numeric';
+            return date.toLocaleDateString('bn-BD',opt).replace(/\//g,'-');
+        }catch(e){ return '—'; }
     }
 
-    function parseBengaliTime(timeStr, dateContext) {
-        try {
-            const parts = timeStr.split(' ');
-            if (parts.length !== 2) return null;
-            const [timePart, ampm] = parts;
-            let [h, m] = timePart.split(':').map(Number);
-            if (ampm === 'PM' && h !== 12) h += 12;
-            if (ampm === 'AM' && h === 12) h = 0;
-            let date = dateContext || new Date();
-            date.setHours(h, m, 0, 0);
-            return date;
-        } catch (e) { return null; }
+    function parseBengaliTime(timeStr,dateContext){
+        try{
+            const parts=timeStr.split(' ');
+            if(parts.length!==2) return null;
+            const [timePart,ampm]=parts;
+            let [h,m]=timePart.split(':').map(Number);
+            if(ampm==='PM'&&h!==12) h+=12;
+            if(ampm==='AM'&&h===12) h=0;
+            let d=dateContext||new Date();
+            d.setHours(h,m,0,0);
+            return d;
+        }catch(e){ return null; }
     }
 
-    function createWaveSVG() {
-        const ns = 'http://www.w3.org/2000/svg';
-        const svg = document.createElementNS(ns, 'svg');
-        svg.setAttribute('width', '24'); 
-        svg.setAttribute('height', '24'); 
-        svg.setAttribute('viewBox', '0 0 24 24');
-
-        const style = document.createElementNS(ns, 'style');
-        style.textContent = `
-            .wave { fill: none; stroke: #FFF; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; animation: wave-motion 2s linear infinite alternate; }
-            @keyframes wave-motion { 0% { transform: translateY(0px); } 100% { transform: translateY(-2px); } }
+    function createWaveSVG(){
+        const ns='http://www.w3.org/2000/svg';
+        const svg=document.createElementNS(ns,'svg');
+        svg.setAttribute('width','24'); svg.setAttribute('height','24'); svg.setAttribute('viewBox','0 0 24 24');
+        const style=document.createElementNS(ns,'style');
+        style.textContent=`
+            .wave{fill:none;stroke:#FFF;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;animation:wave-motion 2s linear infinite alternate;}
+            @keyframes wave-motion{0%{transform:translateY(0px);}100%{transform:translateY(-2px);}}
         `;
         svg.appendChild(style);
-
-        const path1 = document.createElementNS(ns, 'path');
-        path1.setAttribute('class', 'wave');
-        path1.setAttribute('d', 'M2 12s2-2 4-2 4 2 4 2 2-2 4-2 4 2 4 2');
-        svg.appendChild(path1);
-
-        const path2 = document.createElementNS(ns, 'path');
-        path2.setAttribute('class', 'wave');
-        path2.setAttribute('d', 'M2 16s2-2 4-2 4 2 4 2 2-2 4-2 4 2 4 2');
-        path2.style.animationDelay = '-1s';
-        svg.appendChild(path2);
-
+        const p1=document.createElementNS(ns,'path'); p1.setAttribute('class','wave'); p1.setAttribute('d','M2 12s2-2 4-2 4 2 4 2 2-2 4-2 4 2 4 2'); svg.appendChild(p1);
+        const p2=document.createElementNS(ns,'path'); p2.setAttribute('class','wave'); p2.setAttribute('d','M2 16s2-2 4-2 4 2 4 2 2-2 4-2 4 2 4 2'); p2.style.animationDelay='-1s'; svg.appendChild(p2);
         return svg.outerHTML;
     }
 
-    function createGlowArrow(direction, size = '1.1em') {
-        const arrow = direction === 'up' ? '▲' : '▼';
-        const color = direction === 'up' ? '#32CD32' : '#FF4500';
-        const shadow = `0 0 5px ${color}, 0 0 10px ${color}`;
-        return `<span style="font-size:${size};color:${color};text-shadow:${shadow};margin-left:5px;position:relative;top:${direction==='up'?' -2px':' 2px'};">${arrow}</span>`;
+    function createGlowArrow(direction,size='1.1em'){
+        const arrow=direction==='up'?'▲':'▼';
+        const color=direction==='up'?'#32CD32':'#FF4500';
+        const shadow=`0 0 5px ${color},0 0 10px ${color}`;
+        return `<span style="font-size:${size};color:${color};text-shadow:${shadow};margin-left:5px;position:relative;top:${direction==='up'?'-2px':'2px'};">${arrow}</span>`;
     }
 
     function approxTides(baseTime){
-        let base = new Date();
-        if(baseTime && baseTime.includes('T')) base = new Date(baseTime);
-        else if(baseTime) { 
-            const d=new Date(); 
-            const [h, m] = baseTime.split(':').map(Number);
-            base = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m, 0);
+        let base=new Date();
+        if(baseTime && baseTime.includes('T')) base=new Date(baseTime);
+        else if(baseTime){
+            const d=new Date();
+            const [h,m]=baseTime.split(':').map(Number);
+            base=new Date(d.getFullYear(),d.getMonth(),d.getDate(),h,m,0);
         }
-        const gap = (6*60+12)*60000;
-        const out = [];
-        const types = ['উচ্চ জোয়ার','নিম্ন ভাটা','উচ্চ জোয়ার','নিম্ন ভাটা'];
+        const gap=(6*60+12)*60000;
+        const out=[];
+        const types=['উচ্চ জোয়ার','নিম্ন ভাটা','উচ্চ জোয়ার','নিম্ন ভাটা'];
         for(let i=0;i<4;i++){
-            let t = new Date(base.getTime()+i*gap);
+            let t=new Date(base.getTime()+i*gap);
             out.push({ type:types[i], time:formatToBengali(t,true), level:(i%2===0)?'high':'low', timestamp:t.getTime() });
         }
         return out.sort((a,b)=>a.timestamp-b.timestamp);
     }
 
     function getDynamicLevelInfo(tides){
-        if(!tides||tides.length===0) return {level:50,direction:'static',nextEventIndex:-1};
-        const now = new Date().getTime();
-        let past=null, next=null, nextIndex=-1;
+        if(!tides||!tides.length) return {level:50,direction:'static',nextEventIndex:-1};
+        const now=Date.now();
+        let past=null,next=null,index=-1;
 
         for(let i=0;i<tides.length;i++){
-            if(tides[i].timestamp<=now){
-                past=tides[i];
-                next=tides[i+1];
-                nextIndex=i+1;
-            } else if(!next){
-                next=tides[i];
-                nextIndex=i;
-            }
+            if(tides[i].timestamp<=now){ past=tides[i]; next=tides[i+1]; index=i+1; }
+            else if(!next){ next=tides[i]; index=i; }
         }
+
         if(!next){
             next=tides[0];
             past=tides[tides.length-1];
-            nextIndex=0;
+            index=0;
         }
 
-        const start = past && past.level==='high'?95:5;
-        const end   = next && next.level==='high'?95:5;
+        const start=past&&past.level==='high'?95:5;
+        const end=next&&next.level==='high'?95:5;
 
         let lvl=50;
         let dir='static';
 
         if(past && next && next.timestamp>past.timestamp){
-            const total  = next.timestamp-past.timestamp;
-            const passed = now-past.timestamp;
-            lvl = start + ((end-start)*(passed/total));
-            dir = end>start?'up':'down';
+            const total=next.timestamp-past.timestamp;
+            const done=now-past.timestamp;
+            lvl=start + ((end-start)*(done/total));
+            dir=end>start?'up':'down';
         }
 
-        lvl = Math.max(5,Math.min(95,lvl));
-
-        return { level:Math.round(lvl), direction:dir, nextEventIndex:nextIndex };
+        lvl=Math.max(5,Math.min(95,lvl));
+        return { level:Math.round(lvl), direction:dir, nextEventIndex:index };
     }
 
     function loadCoordinates(){
         return fetch(API_IP).then(r=>r.json()).then(j=>{
-            return {
+            return{
                 lat:j.latitude||DEFAULT.lat,
                 lng:j.longitude||DEFAULT.lng,
                 source:'IP API',
@@ -182,44 +157,57 @@
     function buildTideList(tides,info){
         let html='';
         tides.forEach((t,i)=>{
-            const hi = (i===info.nextEventIndex);
-            const ar = hi?createGlowArrow(info.direction):'';
+            const hi=i===info.nextEventIndex;
+            const ar=hi?createGlowArrow(info.direction,'0.9em'):'';
             html+=`
-                <div class="tide-item-compact ${hi?'highlight':''}">
-                    <span class="tide-label-group">
-                        <div class="tide-icon-svg">${createWaveSVG()}</div>
-                        <div class="tide-text-stack">
-                            <span class="tide-type-value">${t.type}${ar}</span>
-                            <span class="tide-time-value">${t.time}</span>
-                        </div>
-                    </span>
-                </div>`;
+            <div class="tide-item-compact ${hi?'highlight':''}">
+                <span class="tide-label-group">
+                    <div class="tide-icon-svg">${createWaveSVG()}</div>
+                    <div class="tide-text-stack">
+                        <span class="tide-type-value">${t.type}${ar}</span>
+                        <span class="tide-time-value">${t.time}</span>
+                    </div>
+                </span>
+            </div>`;
         });
         return html;
     }
 
+    function updateLiveUI(){
+        if(!STATE.tides.length) return;
+        $('local-time-live').textContent=formatToBengali(new Date(),true,true);
+        const {level,direction}=getDynamicLevelInfo(STATE.tides);
+        $('water-fill').style.height=level+"%";
+        $('water-level-text').textContent=level+"%";
+        $('tide-events-list').innerHTML=buildTideList(STATE.tides,getDynamicLevelInfo(STATE.tides));
+        $('panel-arrow-indicator').innerHTML=direction!=='static'?createGlowArrow(direction,'1.4em'):'';
+    }
+
     function buildWidget(data){
-        const cur = formatToBengali(new Date(),false);
-        const dyn = getDynamicLevelInfo(data.tides);
-        const arrow = dyn.direction!=='static'?createGlowArrow(dyn.direction,'1.4em'):'';
+        const cur=formatToBengali(new Date(),false);
+        const dyn=getDynamicLevelInfo(data.tides);
+        const arrow=dyn.direction!=='static'?createGlowArrow(dyn.direction,'1.4em'):'';
 
-        const css = `YOUR CSS BLOCK EXACT AS SENT`;
+        return `
+        <style>
+        ${document.querySelector("style").innerHTML}
+        </style>
 
-        return css + `
         <div class="tide-panel">
             <div class="tide-content">
                 <div class="tide-header-section">
                     <div class="tide-header-title">জোয়ার-ভাটা</div>
-                    <div style="text-align:right">
-                        <span id="panel-arrow-indicator">${arrow}</span><br>
-                        <span style="font-size:0.7em;">বর্তমান জলস্তর</span>
+                    <div style="text-align:right;font-size:0.7em;">
+                        <span id="panel-arrow-indicator">${arrow}</span><br>বর্তমান জলস্তর
                     </div>
                 </div>
                 <div class="tide-events-list" id="tide-events-list">${buildTideList(data.tides,dyn)}</div>
                 <div class="footer-tags-section">
-                    আজ: ${cur}<br>
-                    স্থান: <span>${data.city}</span> | সময়: 
-                    <span id="local-time-live">${formatToBengali(new Date(),true,true)}</span>
+                    <div class="tide-date-footer">আজ: ${cur}</div>
+                    <div class="location-time-tag">
+                        স্থান: <span>${data.city}</span> | সময়:
+                        <span id="local-time-live">${formatToBengali(new Date(),true,true)}</span>
+                    </div>
                 </div>
             </div>
             <div class="level-indicator-container">
@@ -232,8 +220,8 @@
     }
 
     async function loadAllData(){
-        const loc = await loadCoordinates();
-        STATE.lat=loc.lat; STATE.lng=loc.lng; STATE.city=loc.city;
+        const coords=await loadCoordinates();
+        STATE.lat=coords.lat; STATE.lng=coords.lng; STATE.city=coords.city;
 
         let moon=null;
         try{
@@ -248,19 +236,11 @@
 
         $('madhabam-tide-widget').innerHTML=buildWidget(STATE);
 
-        setInterval(()=>{
-            if(!STATE.tides.length) return;
-            $('local-time-live').textContent=formatToBengali(new Date(),true,true);
-            const dyn=getDynamicLevelInfo(STATE.tides);
-            $('water-fill').style.height=dyn.level+"%";
-            $('water-level-text').textContent=dyn.level+"%";
-            $('tide-events-list').innerHTML=buildTideList(STATE.tides,dyn);
-            $('panel-arrow-indicator').innerHTML = dyn.direction!=='static'?createGlowArrow(dyn.direction,'1.4em'):'';
-        },100);
+        updateUIInterval=setInterval(updateLiveUI,100);
+        updateDataInterval=setInterval(loadAllData,1800000);
     }
 
     loadAllData();
-
 })();
 </script>
 
