@@ -20,7 +20,7 @@
         padding: 0;
     }
 
-    /* ২. ওয়েভ অ্যানিমেশন স্টাইল (SVG থেকে এখানে আনা হলো) */
+    /* ২. ওয়েভ অ্যানিমেশন স্টাইল */
     .wave{
         fill:none;
         stroke:#FFF;
@@ -46,9 +46,8 @@
         position: relative; 
     }
 
-    /* ৪. জলস্তর বার স্টাইল (স্ক্রিনশট ২ এর মতো) */
+    /* ৪. জলস্তর বার স্টাইল */
     .level-indicator-container {
-        /* ডানদিকে স্থির ও কন্টেন্ট এর উচ্চতা অনুযায়ী */
         position: absolute; 
         right: 15px; 
         top: 15px;
@@ -86,8 +85,8 @@
         font-weight: bold;
         z-index: 10;
         text-shadow: 0 0 2px #fff;
-        transform: translateY(50%); /* এই ট্রান্সফর্মটি ডাইনামিক bottom-এর সাথে সঠিক পজিশন দেবে */
-        transition: bottom 0.5s ease-out; /* টেক্সট এর মুভমেন্ট স্মুথ করার জন্য */
+        transform: translateY(50%); 
+        transition: bottom 0.5s ease-out; 
     }
 
     /* ৬. বাম কন্টেন্ট স্টাইল */
@@ -97,8 +96,7 @@
         flex-direction: column;
         justify-content: space-between;
         padding-right: 20px; 
-        /* জলস্তর বারটি অ্যাবসোলিউট পজিশনিং হওয়ায়, কন্টেন্টের প্রস্থ ঠিক করতে হবে */
-        max-width: calc(100% - 40px - 20px - 15px); /* প্যানেল প্রস্থ - বার প্রস্থ - ডান প্যাডিং - বাম প্যাডিং */
+        max-width: calc(100% - 40px - 20px - 15px);
     }
 
     .tide-header-section {
@@ -160,8 +158,8 @@
     /* ৭. হাইলাইট স্টাইল */
     .highlight {
         background-color: rgba(255, 255, 255, 0.2); 
-        margin: 0 -15px; /* বাম প্যাডিং বরাবর */
-        padding: 6px 15px 6px 15px; 
+        margin: 0 -15px; 
+        padding: 6px 15px; 
         border-radius: 4px;
     }
     .highlight .tide-item-compact {
@@ -169,17 +167,27 @@
         padding: 0;
     }
     .highlight .tide-text-stack {
-        margin-left: 10px; /* হাইলাইট অবস্থায় ফিক্স করা হলো */
+        margin-left: 10px; 
     }
 
-    /* ৮. ফুটার স্টাইল */
+    /* ৮. ফুটার স্টাইল (গুরুত্বপূর্ণ ফিক্স) */
     .footer-tags-section {
         margin-top: 15px;
         font-size: 0.85em;
         line-height: 1.4;
+        display: flex; 
+        flex-wrap: wrap; 
+        justify-content: space-between; 
     }
     .tide-date-footer {
         margin-bottom: 3px;
+        width: 100%; 
+    }
+    .location-time-tag {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        width: 100%; 
     }
     .location-time-tag span {
         color: #f7d730;
@@ -231,12 +239,10 @@
     function createWaveSVG(){
         const ns='http://www.w3.org/2000/svg';
         const svg=document.createElementNS(ns,'svg');
-        // viewBox পরিবর্তন করা হয়েছে যাতে wave অ্যানিমেশনটি সঠিকভাবে দেখা যায়
         svg.setAttribute('width','24'); 
         svg.setAttribute('height','24'); 
         svg.setAttribute('viewBox','0 0 24 24'); 
         
-        // CSS এখন <style> ট্যাগের মধ্যে আছে, তাই এখানে শুধু path যোগ করা হলো
         const p1=document.createElementNS(ns,'path'); 
         p1.setAttribute('class','wave'); 
         p1.setAttribute('d','M2 12s2-2 4-2 4 2 4 2 2-2 4-2 4 2 4 2'); 
@@ -287,10 +293,40 @@
         }
 
         if(!next){
-            next=tides[0];
-            past=tides[tides.length-1];
-            index=0;
+            // If the last event has passed, wrap to the first event of the next period (approx a day later)
+            // For a simpler widget, let's wrap to the first event of the current list if all have passed
+            if(tides[tides.length-1].timestamp < now){
+                past = tides[tides.length-1];
+                const nextTides = approxTides(new Date(past.timestamp + (6*60+12)*60000)); // Approx next tide
+                if (nextTides.length > 0) {
+                    next = nextTides[0];
+                    // We need a way to reliably calculate the *next* next event's time, not just the next one on the list
+                    // For now, let's keep the simple logic and ensure correct indexing
+                }
+            } else {
+                next = tides[0];
+                past = tides[tides.length-1];
+                index = 0;
+            }
         }
+        
+        // Correct next event index determination:
+        // Find the *first* event that is later than "now"
+        index = tides.findIndex(t => t.timestamp > now);
+        if (index === -1) {
+            // If all passed, highlight the first one (for the next day)
+            index = 0;
+            past = tides[tides.length-1];
+            // Simulate next event being tomorrow for calculation
+            const nextDayTide = new Date(tides[0].timestamp);
+            nextDayTide.setDate(nextDayTide.getDate() + 1);
+            next = { ...tides[0], timestamp: nextDayTide.getTime() };
+        } else {
+            // Find the last event that is earlier than "now"
+            past = tides[index - 1] || null;
+            next = tides[index];
+        }
+        
 
         const start=past&&past.level==='high'?95:5;
         const end=next&&next.level==='high'?95:5;
@@ -308,6 +344,7 @@
         lvl=Math.max(5,Math.min(95,lvl)); 
         return { level:Math.round(lvl), direction:dir, nextEventIndex:index };
     }
+
 
     function loadCoordinates(){
         return fetch(API_IP).then(r=>r.json()).then(j=>{
@@ -348,17 +385,17 @@
         const dynInfo=getDynamicLevelInfo(STATE.tides);
         const {level,direction}=dynInfo;
         
-        // জলস্তর আপডেট (CSS এ transition যোগ করা হয়েছে)
+        // জলস্তর আপডেট (ডাইনামিক)
         $('water-fill').style.height=level+"%";
         
-        // জলস্তর টেক্সট আপডেট (ডাইনামিক পজিশন)
+        // জলস্তর টেক্সট আপডেট (গুরুত্বপূর্ণ ফিক্স)
         $('water-level-text').textContent=level+"%";
-        $('water-level-text').style.bottom=`calc(${level}% - 0.7em)`; // 0.7em বিয়োগ করা হলো যাতে % লেখাটি বারের মাঝখানে থাকে
+        $('water-level-text').style.bottom=`calc(${level}% - 8px)`; 
 
-        // জোয়ার-ভাটা তালিকা আপডেট
+        // জোয়ার-ভাটা তালিকা আপডেট (ডাইনামিক হাইলাইট)
         $('tide-events-list').innerHTML=buildTideList(STATE.tides,dynInfo);
         
-        // তীরচিহ্ন আপডেট
+        // তীরচিহ্ন আপডেট (ডাইনামিক ইন্ডিকেটর)
         $('panel-arrow-indicator').innerHTML=direction!=='static'?createGlowArrow(direction,'1.4em'):'';
     }
 
@@ -374,7 +411,7 @@
             
             <div class="level-indicator-container">
                 <div id="water-level-text" class="water-level-text" 
-                     style="bottom:calc(${dyn.level}% - 0.7em);">${dyn.level}%</div>
+                     style="bottom:calc(${dyn.level}% - 8px);">${dyn.level}%</div>
                 <div class="level-indicator-bar">
                     <div id="water-fill" class="water-fill" style="height:${dyn.level}%"></div>
                 </div>
@@ -406,10 +443,13 @@
 
         let moon=null;
         try{
+            // Open-Meteo API call is prone to failure, adding robust error handling
             const r=await fetch(API_OM+`?latitude=${STATE.lat}&longitude=${STATE.lng}&daily=moonrise&timezone=auto`);
+            if (!r.ok) throw new Error("API not OK");
             const j=await r.json();
             moon=(j.daily&&j.daily.moonrise&&j.daily.moonrise[0])?j.daily.moonrise[0]:FALLBACK_DATA.tide_anchor_fallback;
         }catch(e){
+            console.error("Tide data API error, using fallback time.", e);
             moon=FALLBACK_DATA.tide_anchor_fallback;
         }
 
@@ -422,7 +462,7 @@
         updateUIInterval=setInterval(updateLiveUI,100);
         
         if(updateDataInterval) clearInterval(updateDataInterval);
-        updateDataInterval=setInterval(loadAllData,1800000);
+        updateDataInterval=setInterval(loadAllData,1800000); // 30 minutes interval
     }
 
     loadAllData();
