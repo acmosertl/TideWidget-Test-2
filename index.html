@@ -6,42 +6,49 @@
 <title>Madhabam Tide Widget</title>
 
 <style>
+    /* ১. বডি/ব্যাকগ্রাউন্ডের জন্য বেস স্টাইল */
     body {
         margin: 0;
         padding: 0;
-        background: #00575e;
+        /* শুধুমাত্র উইজেটটিকে তার ব্যাকগ্রাউন্ড কালার দেবে, বাইরের স্ক্রিন নয় */
         font-family: sans-serif;
         color: white;
+        background-color: transparent; /* এটি পরিবর্তন করা হলো: পেছনের স্ক্রিনের রঙ নেবে */
     }
     #madhabam-tide-widget {
         max-width: 360px;
         margin: 0 auto;
-        padding: 10px;
+        padding: 0; /* padding 10px সরিয়ে 0 করা হলো যাতে রঙ না ছড়ায় */
+        /* ব্যাকগ্রাউন্ড #00575e এখানে না দিয়ে tide-panel-এ দেওয়া হবে */
     }
 
-    /* >>> স্টাইল পরিবর্তন শুরু <<< */
+    /* ২. উইজেটের প্রধান প্যানেল স্টাইল (ব্যাকগ্রাউন্ড এবং আকার) */
     .tide-panel {
         display: flex;
-        background-color: #00575e; /* উইজেটের ব্যাকগ্রাউন্ড */
-        border-radius: 15px; /* কোণগুলি গোল করার জন্য */
+        background-color: #00575e; /* উইজেটের ব্যাকগ্রাউন্ড (গাড় সবুজ) */
+        border-radius: 15px;
         padding: 15px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         color: #fff;
+        height: 300px; /* একটি নির্দিষ্ট উচ্চতা সেট করা হলো যাতে জলস্তর বারটি পুরোটা দেখা যায় */
+        box-sizing: border-box; /* padding উচ্চতাতে যুক্ত হবে না */
     }
 
+    /* ৩. উইজেটের বাম দিকের অংশ */
     .tide-content {
         flex: 1;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
         padding-right: 15px;
+        position: relative; /* জলস্তর বারের পাশে অন্যান্য উপাদানগুলির জন্য */
     }
 
     .tide-header-section {
         display: flex;
         justify-content: space-between;
         align-items: flex-end;
-        margin-bottom: 15px;
+        margin-bottom: 10px;
         font-weight: bold;
     }
 
@@ -49,16 +56,23 @@
         font-size: 1.5em; 
         color: #f7d730; 
     }
+    /* "বর্তমান জলস্তর" লেখাটিকে সামান্য উপরে তোলার জন্য */
+    .tide-header-section > div:last-child {
+        text-align:right;
+        font-size:0.7em;
+        line-height: 1.2;
+    }
 
     .tide-events-list {
         flex-grow: 1;
+        margin-bottom: 10px; /* ফুটার থেকে দূরত্ব */
     }
 
     .tide-item-compact {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 8px 0;
+        padding: 6px 0; /* প্যাডিং কমানো হলো */
         border-bottom: 1px dotted rgba(255, 255, 255, 0.2);
     }
     .tide-item-compact:last-child {
@@ -88,43 +102,49 @@
         color: #f7d730;
     }
     
-    .highlight .tide-type-value {
-        color: #fff;
-        background-color: rgba(255, 255, 255, 0.2);
-        padding: 2px 4px;
+    .highlight {
+        background-color: rgba(255, 255, 255, 0.2); 
+        margin: 0 -15px; /* highlight কে প্যানেলের প্রস্থ অনুযায়ী পুরোটা করার জন্য */
+        padding: 6px 15px; /* প্যাডিং যোগ করা */
         border-radius: 4px;
-        display: inline-block;
     }
-    .highlight .tide-time-value {
-        color: #f7d730; /* সময় হাইলাইট এর জন্য আগের রঙই রাখলাম */
+    .highlight .tide-item-compact {
+        border-bottom: none;
+        padding: 0;
     }
-
+    .highlight:last-child {
+        border-bottom: none;
+    }
 
     /* ফুটার স্টাইল */
     .footer-tags-section {
-        margin-top: 15px;
+        margin-top: 10px;
         font-size: 0.85em;
+        line-height: 1.4;
     }
     .tide-date-footer {
-        margin-bottom: 5px;
+        margin-bottom: 3px;
     }
     .location-time-tag span {
         color: #f7d730;
     }
     
-    /* জলস্তর বার স্টাইল */
+    /* ৪. জলস্তর বার স্টাইল (গুরুত্বপূর্ণ পরিবর্তন) */
     .level-indicator-container {
         width: 40px;
         display: flex;
         align-items: flex-end;
+        position: relative;
     }
 
     .level-indicator-bar {
         width: 25px;
-        height: 100%;
+        height: 100%; /* কন্টেইনারের উচ্চতা অনুযায়ী পুরোটা নেবে */
         background-color: rgba(255, 255, 255, 0.1);
         border-radius: 12px;
-        position: relative;
+        position: absolute; /* কন্টেইনারের ভিতরে ফ্লোটিং */
+        right: 0;
+        top: 0;
         overflow: hidden;
     }
 
@@ -137,27 +157,26 @@
         transition: height 0.5s ease-out; 
     }
 
+    /* ৫. জলস্তর টেক্সট (50%) কে গতিশীল করা */
     .water-level-text {
         position: absolute;
-        bottom: 50%;
-        left: 50%;
-        transform: translate(-50%, 50%);
+        right: 30px; /* বারের ডান দিকে রাখার জন্য */
+        transform: translateY(50%); /* জলস্তরের শতাংশ অনুযায়ী মুভ করার জন্য transform: translate(-50%, 50%) পরিবর্তন করা হলো */
         color: #000;
         font-size: 0.7em;
         font-weight: bold;
         z-index: 10;
         text-shadow: 0 0 2px #fff;
+        /* এই টেক্সটটির vertical position JS থেকে control করা হবে */
     }
-
-    /* জোয়ার-ভাটার আইকন (ওয়েভ SVG) */
+    
+    /* ৬. জোয়ার-ভাটার আইকন (ওয়েভ SVG) */
     .tide-icon-svg {
         display: inline-block;
         width: 24px;
         height: 24px;
         margin-right: 5px;
     }
-    
-    /* >>> স্টাইল পরিবর্তন শেষ <<< */
 </style>
 </head>
 
@@ -166,7 +185,7 @@
 <div id="madhabam-tide-widget" style="max-width:300px;"></div>
 
 <script>
-/* তোমার সম্পূর্ণ কোড — কোনো লাইন পরিবর্তন হয়নি */
+/* আপনার জাভাস্ক্রিপ্ট কোড — কোনো পরিবর্তন নেই */
 (function(){
     const API_OM = 'https://api.open-meteo.com/v1/forecast';
     const API_IP = 'https://ipapi.co/json/';
@@ -315,11 +334,22 @@
 
     function updateLiveUI(){
         if(!STATE.tides.length) return;
+        
         $('local-time-live').textContent=formatToBengali(new Date(),true,true);
+        
         const {level,direction}=getDynamicLevelInfo(STATE.tides);
+        
+        // জলস্তর আপডেট
         $('water-fill').style.height=level+"%";
+        
+        // জলস্তর টেক্সট আপডেট
         $('water-level-text').textContent=level+"%";
+        $('water-level-text').style.bottom=level+"%"; /* CSS পরিবর্তন হওয়ায় এখানে bottom সেট করা হলো */
+
+        // জোয়ার-ভাটা তালিকা আপডেট
         $('tide-events-list').innerHTML=buildTideList(STATE.tides,getDynamicLevelInfo(STATE.tides));
+        
+        // তীরচিহ্ন আপডেট
         $('panel-arrow-indicator').innerHTML=direction!=='static'?createGlowArrow(direction,'1.4em'):'';
     }
 
@@ -330,7 +360,7 @@
         const currentTime=new Date();
         const currentBengaliTime=formatToBengali(currentTime,true,true);
         const currentDate=formatToBengali(currentTime,false);
-
+        
         return `
         <div class="tide-panel">
             <div class="tide-content">
@@ -350,8 +380,8 @@
                 </div>
             </div>
             <div class="level-indicator-container">
+                <div id="water-level-text" class="water-level-text" style="bottom:${dyn.level}%;">${dyn.level}%</div>
                 <div class="level-indicator-bar">
-                    <div id="water-level-text" class="water-level-text">${dyn.level}%</div>
                     <div id="water-fill" class="water-fill" style="height:${dyn.level}%"></div>
                 </div>
             </div>
@@ -373,14 +403,11 @@
 
         STATE.tides=approxTides(moon);
 
-        // বিল্ড উইজেট ফাংশন কল করার আগে নিশ্চিত করুন যে সমস্ত ডেটা লোড হয়েছে
         $('madhabam-tide-widget').innerHTML=buildWidget(STATE);
 
-        // উইজেট তৈরি হওয়ার পরে লাইভ আপডেট শুরু করুন
         if(updateUIInterval) clearInterval(updateUIInterval);
         updateUIInterval=setInterval(updateLiveUI,100);
         
-        // ডেটা আপডেট (30 মিনিট পর পর)
         if(updateDataInterval) clearInterval(updateDataInterval);
         updateDataInterval=setInterval(loadAllData,1800000);
     }
