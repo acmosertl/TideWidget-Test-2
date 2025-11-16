@@ -26,7 +26,7 @@
         স্থান: <strong id="location-name">Kolakata</strong> |
         স্থানীয় সময়: <strong id="local-time-display"></strong>
         
-        <div id="api-key-warning" style="display: none; color: #ffeb3b; font-size: 0.8em; margin-top: 5px; padding-top: 5px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+        <div id="api-key-warning" style="display: none; color: #ffeb3b; font-size: 0.8em; margin-top: 5px; padding-top: 5px; border-top: 1px solid rgba(255, 255, 255, 0.2);">
              জোয়ার-ভাটার তথ্য বর্তমানে লোড হচ্ছে না (ফলব্যাক ডেটা ব্যবহৃত হচ্ছে)
         </div>
     </div>
@@ -34,7 +34,7 @@
 
 <style>
 /* ---------------------------------
-   CSS: (চারটি অবস্থার জন্য রংয়ের পরিবর্তন)
+   CSS: (আগের মতোই রইল, শুধুমাত্র ফন্টের সমস্যা এড়াতে)
    --------------------------------- */
 .tide-widget {
     background-color: #2e5c6a; 
@@ -107,7 +107,7 @@
 
 .tide-info {
     font-size: 1.0em; 
-    color: #cfd8dc; /* Default color for HHW/LLW (উচ্চ জোয়ার/নিম্ন ভাটা) */
+    color: #cfd8dc; 
     flex-shrink: 0; 
     display: flex;
     align-items: center;
@@ -199,7 +199,7 @@
 
 <script>
 // ---------------------------------
-// JavaScript: তিনটি স্তরের ফলব্যাক লজিক
+// JavaScript: লজিক্যাল এবং সাইন্টিফিকালি ফিক্স করা হয়েছে
 // ---------------------------------
 
 const STATE = {
@@ -219,7 +219,8 @@ const MOON_API = `https://api.open-meteo.com/v1/forecast?latitude=${STATE.lat}&l
 
 // Caching variables
 const CACHE_KEY = 'tideWidgetData';
-const CACHE_EXPIRY_MS = 8 * 60 * 60 * 1000; // 8 hours Cache time
+// **পরিবর্তন:** ক্যাশ এখন ২৪ ঘণ্টা করা হলো (24 * 60 * 60 * 1000 মিলিসেকেন্ড)
+const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; 
 
 let updateUIInterval; 
 let updateDataInterval; 
@@ -272,24 +273,45 @@ function setCachedData(tides) {
     }
 }
 
-// --- ULTIMATE FALLBACK DATA (Level 3 Fallback) ---
+// --- ULTIMATE FALLBACK DATA (Level 3 Fallback - Scientific Average) ---
 function getLocalFallbackTides() {
-    // কলকাতার জন্য আনুমানিক গড় সময়: 1AM-এ High Tide ধরে প্রতিটি ইভেন্টের মধ্যে গড় 6h 12.5m সময়
+    // কলকাতার জন্য আনুমানিক গড় সময়: 1AM-এ High Tide ধরে, গড় 6h 12.5m পর পর
     const now = new Date();
-    const firstHighTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 1, 0, 0);
     
-    const tides = [];
+    // শুরু করার জন্য আজকের সবচেয়ে কাছের High Tide সময় খুঁজে বের করা
     const avgTideCycleDurationMs = 6 * 60 * 60 * 1000 + 12.5 * 60 * 1000;
-    let currentTime = firstHighTime.getTime();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).getTime();
     
-    for (let i = 0; i < 6; i++) {
-        const type = i % 2 === 0 ? 'High' : 'Low';
-        tides.push({ time: new Date(currentTime).toISOString(), type: type });
-        currentTime += avgTideCycleDurationMs;
+    let baseTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 1, 0, 0).getTime(); 
+
+    // Find the closest past HHW
+    while (baseTime > now.getTime()) {
+        baseTime -= avgTideCycleDurationMs * 2; // Subtract two cycles to go back to the first HHW of the day
     }
     
-    // Only return tides that are relevant (last 12 hours onwards)
-    return tides.filter(tide => new Date(tide.time) > new Date().getTime() - (12 * 60 * 60 * 1000));
+    // Generate up to 6 events (covering roughly 30 hours)
+    const tides = [];
+    let currentTime = baseTime;
+    
+    for (let i = 0; i < 6; i++) {
+        const typeIndex = i % 4;
+        let type;
+        if (typeIndex === 0 || typeIndex === 2) { // 0, 2 are High Tides
+            type = 'High';
+        } else { // 1, 3 are Low Tides
+            type = 'Low';
+        }
+
+        // Apply 6h 12.5m time difference
+        if(i > 0) {
+            currentTime += avgTideCycleDurationMs;
+        }
+        
+        tides.push({ time: new Date(currentTime).toISOString(), type: type });
+    }
+    
+    // Only return tides that are relevant (from the closest event onwards, covering ~24h)
+    return tides.filter(tide => new Date(tide.time) > new Date().getTime() - (3 * 60 * 60 * 1000));
 }
 
 // --- Moon Phase Calculation (Level 2 Fallback) ---
@@ -299,7 +321,7 @@ async function fetchMoonPhase() {
         if (!response.ok) throw new Error('Moon API failed');
         const data = await response.json();
         
-        const moonCode = data.daily.moon_phase[0]; // Moon Phase 0-24
+        const moonCode = data.daily.moon_phase[0]; 
         
         let factor = 1.0;
         // Spring Tide (Full/New Moon) - Higher Range
@@ -325,14 +347,17 @@ function buildTideList(tides) {
     const now = new Date();
     let isCurrentTideFound = false;
     
-    // Logic for four alternating states
+    // Logic for four alternating states (HHW, LHW, LLW, HLW)
     let highCount = 0; 
     let lowCount = 0;  
     const waterIcon = '<span class="wave-icon">≈</span>'; 
 
-    const displayTides = dataTides.filter(tide => new Date(tide.time) > new Date().getTime() - (12 * 60 * 60 * 1000) );
+    // Only display up to 6 upcoming events
+    const displayTides = dataTides
+        .filter(tide => new Date(tide.time) > new Date().getTime() - (12 * 60 * 60 * 1000)) // Start from slightly past now
+        .slice(0, 6); // Limit to 6 events
 
-    displayTides.forEach((tide) => {
+    displayTides.forEach((tide, index) => {
         const tideTime = new Date(tide.time);
         const timeStr = getBengaliTime(tide.time);
         
@@ -340,28 +365,28 @@ function buildTideList(tides) {
         let magnitudeClass = ''; 
         let arrowIcon = ''; 
         
+        // This is the correct logic for Diurnal/Mixed tides
         if (tide.type.toLowerCase() === 'high') {
-            // HHW (উচ্চ জোয়ার) or LHW (নিম্ন জোয়ার)
             if (highCount % 2 === 0) {
-                typeStr = 'উচ্চ জোয়ার'; 
+                typeStr = 'উচ্চ জোয়ার'; // HHW (First/Higher High)
             } else {
-                typeStr = 'নিম্ন জোয়ার'; 
+                typeStr = 'নিম্ন জোয়ার'; // LHW (Second/Lower High - Still high, but lower than HHW)
                 magnitudeClass = 'low-magnitude'; 
             }
             arrowIcon = '<span class="indicator-arrow arrow-up">▲</span>'; 
             highCount++;
         } else {
-            // LLW (নিম্ন ভাটা) or HLW (উচ্চ ভাটা)
             if (lowCount % 2 === 0) {
-                typeStr = 'নিম্ন ভাটা'; 
+                typeStr = 'নিম্ন ভাটা'; // LLW (First/Lower Low)
             } else {
-                typeStr = 'উচ্চ ভাটা'; 
+                typeStr = 'উচ্চ ভাটা'; // HLW (Second/Higher Low - Still low, but higher than LLW)
                 magnitudeClass = 'low-magnitude'; 
             }
             arrowIcon = '<span class="indicator-arrow arrow-down">▼</span>';
             lowCount++;
         }
 
+        // Highlight the NEXT upcoming event
         let isCurrent = !isCurrentTideFound && tideTime > now;
         if (isCurrent) {
             isCurrentTideFound = true;
@@ -369,6 +394,9 @@ function buildTideList(tides) {
 
         const currentArrow = isCurrent ? arrowIcon : ''; 
         
+        // Skip the current highlight on the first informational line
+        const isInfoLine = (index === 0 && !isCurrentTideFound);
+
         html += `
             <div class="tide-entry ${isCurrent ? 'tide-entry-current' : ''}">
                 <div class="tide-info ${magnitudeClass}">
@@ -381,9 +409,8 @@ function buildTideList(tides) {
         `;
     });
     
-    // Current Phase Display
+    // Current Phase Display (Top line with percentage)
     let currentPhaseHTML = '';
-    // Use effective tides (API, Cache, or Local) for UI calculation
     const effectiveTidesCheck = tides.length > 0 ? tides : getLocalFallbackTides();
 
     if (effectiveTidesCheck.length > 0) {
@@ -398,7 +425,7 @@ function buildTideList(tides) {
         }
         
         currentPhaseHTML = `
-            <div class="tide-entry tide-entry-current" style="background-color: rgba(255, 255, 255, 0.25); border-radius: 4px; padding: 10px 5px; margin-bottom: 5px;">
+            <div class="tide-entry tide-entry-current" style="background-color: rgba(255, 255, 255, 0.25); border-radius: 4px; padding: 10px 5px; margin-bottom: 5px; border-top: none;">
                 <div class="tide-info" style="font-weight: bold; color: #ffeb3b;">
                     ${changeIcon} ${currentStatus}
                 </div>
@@ -423,15 +450,17 @@ function updateLevelUI(currentLevel) {
     }
 }
 
+// **Scientific Fix:** Uses Cosine wave logic for smooth transition between events
 function updateLevelAndPhase(tides) {
     const now = new Date().getTime();
     let lastTide = null;
     let nextTide = null;
     let levelPercent = 50; 
     
-    // Use effective tides (API, Cache, or Local)
+    // Use effective tides (API, Cache, or Local Fallback)
     const effectiveTides = tides.length > 0 ? tides : getLocalFallbackTides();
-
+    
+    // Find the last event and the next event
     if (effectiveTides.length > 0) {
         for (let i = 0; i < effectiveTides.length; i++) {
             const tideTime = new Date(effectiveTides[i].time).getTime();
@@ -453,23 +482,35 @@ function updateLevelAndPhase(tides) {
             if (ratio > 1) ratio = 1;
             if (ratio < 0) ratio = 0;
 
-            if (lastTide.type.toLowerCase() === 'low' && nextTide.type.toLowerCase() === 'high') {
-                levelPercent = 50 * (1 - Math.cos(ratio * Math.PI)) + 50; 
+            // Normalize tide types for calculation: High=100%, Low=0%
+            let startLevel = lastTide.type.toLowerCase() === 'high' ? 100 : 0;
+            let endLevel = nextTide.type.toLowerCase() === 'high' ? 100 : 0;
+            
+            // Cosine wave transition
+            if (startLevel === 0 && endLevel === 100) {
+                // Low to High (Rising)
+                levelPercent = 50 * (1 - Math.cos(ratio * Math.PI)) + 50 * 0; 
                 STATE.levelChangeText = 'উচ্চ জোয়ারের দিকে'; 
-            } else if (lastTide.type.toLowerCase() === 'high' && nextTide.type.toLowerCase() === 'low') {
+            } else if (startLevel === 100 && endLevel === 0) {
+                // High to Low (Falling)
                 levelPercent = 50 * (1 + Math.cos(ratio * Math.PI)); 
                 STATE.levelChangeText = 'নিম্ন ভাটার দিকে'; 
             } else {
-                levelPercent = 50;
+                // High to High or Low to Low (Shouldn't happen with correct data, but for safety)
+                levelPercent = startLevel + (endLevel - startLevel) * ratio;
                 STATE.levelChangeText = 'জোয়ার-ভাটার মধ্যবর্তী';
             }
             
-            // Adjust level using the Moon Phase Factor
+            // Adjust level using the Moon Phase Factor to reflect Spring/Neap Tides (Range adjustment)
             const baseFactor = 1.1; 
             const finalFactor = baseFactor * STATE.moonPhaseFactor; 
-            STATE.level = Math.max(0, Math.min(100, levelPercent * finalFactor)); 
             
+            // Adjust the 0-100% range based on the finalFactor
+            const adjustedLevel = (levelPercent / 100 - 0.5) * 2 * finalFactor; // Scale to -1 to 1, then apply factor
+            STATE.level = Math.max(0, Math.min(100, (adjustedLevel / 2 + 0.5) * 100)); // Scale back to 0-100%
+
         } else {
+             // If only one or no event is found (very rare), default to a stable level
              STATE.level = lastTide ? (lastTide.type.toLowerCase() === 'high' ? 95 : 5) : 50;
              STATE.levelChangeText = 'জলস্তর স্থিতিশীল';
         }
@@ -518,7 +559,6 @@ function buildWidget(state) {
 async function loadAllData() {
     document.getElementById('loading-message').style.display = 'block';
     STATE.tides = [];
-    let tidesLoaded = false;
     
     // 1. Fetch Moon Phase (Level 2)
     await fetchMoonPhase();
@@ -527,7 +567,6 @@ async function loadAllData() {
     const cachedTides = getCachedData();
     if (cachedTides) {
         STATE.tides = cachedTides;
-        tidesLoaded = true;
     }
 
     // 3. Try fetching fresh data from the Primary API (dynv6) (Level 1)
@@ -546,7 +585,7 @@ async function loadAllData() {
         }
     } catch (e) {
         console.warn("Fresh data fetch failed:", e);
-        // If fetch fails, STATE.tides remains empty, triggering the local fallback in updateLevelAndPhase/buildWidget.
+        // If fetch fails, STATE.tides remains empty, triggering the local fallback.
     }
     
     updateLevelAndPhase(STATE.tides);
@@ -567,7 +606,8 @@ function updateUI() {
 function initializeWidget() {
     loadAllData(); // Initial load
     updateUIInterval = setInterval(updateUI, 30000); // UI update every 30 seconds
-    updateDataInterval = setInterval(loadAllData, CACHE_EXPIRY_MS); // Full data reload every 8 hours
+    // **পরিবর্তন:** ফুল ডাটা রিলোড এখন ২৪ ঘণ্টা পর পর হবে
+    updateDataInterval = setInterval(loadAllData, CACHE_EXPIRY_MS); 
 }
 
 window.onload = initializeWidget; 
