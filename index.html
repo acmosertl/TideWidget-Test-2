@@ -2,7 +2,7 @@
     <div class="widget-header">
         <div class="tide-title">জোয়ার-ভাটা</div>
         <div class="level-title-flex">
-            <div class="tide-title-sub">বর্তমান জলস্তর</div> 
+            <div id="dynamic-phase-text" class="tide-title-sub">জলস্তর লোড হচ্ছে...</div> 
         </div>
     </div>
 
@@ -26,15 +26,15 @@
         স্থান: <strong id="location-name">Kolakata</strong> |
         স্থানীয় সময়: <strong id="local-time-display"></strong>
         
-        <div id="api-key-warning" style="display: none; color: #ffeb3b; font-size: 0.8em; margin-top: 5px; padding-top: 5px; border-top: 1px solid rgba(255, 255, 255, 0.2);">
-             জোয়ার-ভাটার তথ্য বর্তমানে লোড হচ্ছে না (ফলব্যাক ডেটা ব্যবহৃত হচ্ছে)
+        <div id="api-key-warning" style="display: none; color: #ffeb3b; font-size: 0.8em; margin-top: 5px; padding-top: 5px; border-top: 1px solid rgba(255, 255, 255, 0.2); font-weight: bold;">
+             জোয়ার-ভাটার তথ্য লোড হচ্ছে না (ফলব্যাক ডেটা ব্যবহৃত হচ্ছে)
         </div>
     </div>
 </div>
 
 <style>
 /* ---------------------------------
-   CSS: (আগের মতোই রইল)
+   CSS
    --------------------------------- */
 .tide-widget {
     background-color: #2e5c6a; 
@@ -70,10 +70,11 @@
     align-items: flex-end;
 }
 
-.tide-title-sub {
+#dynamic-phase-text { /* Use ID for dynamic text */
     color: #cfd8dc; 
-    font-size: 0.8em;
-    font-weight: normal;
+    font-size: 0.9em;
+    font-weight: bold;
+    white-space: nowrap;
 }
 
 .tide-body-flex {
@@ -198,7 +199,7 @@
 
 <script>
 // ---------------------------------
-// JavaScript: ফাইনাল ফিক্স - ফলব্যাক লজিক শক্তিশালী করা হয়েছে
+// JavaScript (Final Version with 5-second refresh)
 // ---------------------------------
 
 const STATE = {
@@ -218,12 +219,13 @@ const MOON_API = `https://api.open-meteo.com/v1/forecast?latitude=${STATE.lat}&l
 
 // Caching variables
 const CACHE_KEY = 'tideWidgetData';
-const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; 
+// Data reload interval set to 30 minutes (1,800,000 ms)
+const DATA_REFRESH_MS = 30 * 60 * 1000; 
 
 let updateUIInterval; 
 let updateDataInterval; 
 
-// --- Utility Functions (আগের মতোই রইল) ---
+// --- Utility Functions ---
 function getBengaliTime(date) {
     const options = { hour: '2-digit', minute: '2-digit', hour12: true };
     return new Date(date).toLocaleString('bn-IN', options)
@@ -241,12 +243,15 @@ function toBengaliNumber(num) {
     return String(num).split('').map(char => map[parseInt(char)] || char).join('');
 }
 
+// --- Caching Logic ---
 function getCachedData() {
     try {
         const cachedData = localStorage.getItem(CACHE_KEY);
         if (!cachedData) return null;
+
         const data = JSON.parse(cachedData);
-        if (data.timestamp && data.timestamp > new Date().getTime()) {
+        // Use a 30-minute grace period before hard expiry
+        if (data.timestamp && data.timestamp > new Date().getTime() - DATA_REFRESH_MS) {
             return data.tides;
         }
         return null;
@@ -257,25 +262,29 @@ function getCachedData() {
 
 function setCachedData(tides) {
     try {
-        const expiryTimestamp = new Date().getTime() + CACHE_EXPIRY_MS;
-        const data = { timestamp: expiryTimestamp, tides: tides };
+        const expiryTimestamp = new Date().getTime() + DATA_REFRESH_MS;
+        const data = {
+            timestamp: expiryTimestamp,
+            tides: tides
+        };
         localStorage.setItem(CACHE_KEY, JSON.stringify(data));
     } catch (e) {
         console.error("Error setting cached data:", e);
     }
 }
 
-// --- ULTIMATE FALLBACK DATA (Stronger Logic) ---
+// --- ULTIMATE FALLBACK DATA ---
 function getLocalFallbackTides() {
     const now = new Date();
+    // Approximate average tide cycle length
     const avgTideCycleDurationMs = 6 * 60 * 60 * 1000 + 12.5 * 60 * 1000;
     
-    // Anchor Time: আজকের প্রথম High Tide (HHW) সময় (আনুমানিক 1 AM)
+    // Find a reasonable High Tide anchor (e.g., closest High Tide near now)
     let baseTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 1, 0, 0).getTime(); 
 
-    // Find the closest High Tide event that is *just before* 'now' or within 3 hours
+    // Find the closest past High Tide event
     while (baseTime < now.getTime() - avgTideCycleDurationMs) {
-        baseTime += avgTideCycleDurationMs * 2; // Jump by full cycle (High to next High)
+        baseTime += avgTideCycleDurationMs * 2; 
     }
     while (baseTime > now.getTime() + avgTideCycleDurationMs) {
         baseTime -= avgTideCycleDurationMs * 2; 
@@ -285,14 +294,8 @@ function getLocalFallbackTides() {
     const tides = [];
     let currentTime = baseTime - (2 * avgTideCycleDurationMs);
     
-    for (let i = 0; i < 6; i++) { // Generate 6 events
-        // 0=HHW, 1=LLW, 2=LHW, 3=HLW
-        let type;
-        if (i % 2 === 0) {
-            type = 'High';
-        } else {
-            type = 'Low';
-        }
+    for (let i = 0; i < 6; i++) { 
+        let type = i % 2 === 0 ? 'High' : 'Low';
         
         if(i > 0) {
             currentTime += avgTideCycleDurationMs;
@@ -301,11 +304,11 @@ function getLocalFallbackTides() {
         tides.push({ time: new Date(currentTime).toISOString(), type: type });
     }
     
-    // Filter to show the next 6 events, including any recent past event for calculation
-    return tides.filter(tide => new Date(tide.time) > new Date().getTime() - avgTideCycleDurationMs).slice(0, 6);
+    // Filter to show relevant events (past 6 hours and future)
+    return tides.filter(tide => new Date(tide.time) > new Date().getTime() - (6 * 60 * 60 * 1000)).slice(0, 6);
 }
 
-// --- Moon Phase Calculation (আগের মতোই রইল) ---
+// --- Moon Phase Calculation ---
 async function fetchMoonPhase() {
     try {
         const response = await fetch(MOON_API);
@@ -314,9 +317,12 @@ async function fetchMoonPhase() {
         const moonCode = data.daily.moon_phase[0]; 
         
         let factor = 1.0;
+        // Spring Tide Factor (Higher Range)
         if (moonCode <= 1 || moonCode >= 23 || (moonCode >= 11 && moonCode <= 13)) {
             factor = 1.3; 
-        } else if ((moonCode >= 5 && moonCode <= 7) || (moonCode >= 17 && moonCode <= 19)) {
+        } 
+        // Neap Tide Factor (Lower Range)
+        else if ((moonCode >= 5 && moonCode <= 7) || (moonCode >= 17 && moonCode <= 19)) {
             factor = 0.7; 
         }
         STATE.moonPhaseFactor = factor;
@@ -325,14 +331,14 @@ async function fetchMoonPhase() {
     }
 }
 
-// --- UI Building Functions (আগের মতোই রইল) ---
+// --- UI Building Functions ---
 function buildTideList(tides) {
+    // Use fallback data if API data is missing/failed
     const dataTides = (tides && tides.length > 0) ? tides : getLocalFallbackTides();
     
     let html = '';
     const now = new Date();
     let isCurrentTideFound = false;
-    
     let highCount = 0; 
     let lowCount = 0;  
     const waterIcon = '<span class="wave-icon">≈</span>'; 
@@ -347,6 +353,7 @@ function buildTideList(tides) {
         let magnitudeClass = ''; 
         let arrowIcon = ''; 
         
+        // Correctly handle semi-diurnal tides for labeling
         if (tide.type.toLowerCase() === 'high') {
             if (highCount % 2 === 0) {
                 typeStr = 'উচ্চ জোয়ার'; 
@@ -367,6 +374,7 @@ function buildTideList(tides) {
             lowCount++;
         }
 
+        // Highlight the NEXT upcoming event
         let isCurrent = !isCurrentTideFound && tideTime > now;
         if (isCurrent) {
             isCurrentTideFound = true;
@@ -386,33 +394,8 @@ function buildTideList(tides) {
         `;
     });
     
-    let currentPhaseHTML = '';
-    const effectiveTidesCheck = tides.length > 0 ? tides : getLocalFallbackTides();
-
-    if (effectiveTidesCheck.length > 0) {
-        let currentStatus = STATE.levelChangeText;
-        let changeIcon = '';
-        if (currentStatus.includes('জোয়ারের দিকে')) {
-            changeIcon = '🔺';
-        } else if (currentStatus.includes('ভাটার দিকে')) {
-            changeIcon = '🔻';
-        } else if (currentStatus.includes('স্থিতিশীল')) {
-            changeIcon = '💧';
-        }
-        
-        currentPhaseHTML = `
-            <div class="tide-entry tide-entry-current" style="background-color: rgba(255, 255, 255, 0.25); border-radius: 4px; padding: 10px 5px; margin-bottom: 5px; border-top: none;">
-                <div class="tide-info" style="font-weight: bold; color: #ffeb3b;">
-                    ${changeIcon} ${currentStatus}
-                </div>
-                <div class="tide-time bengali-number">
-                    ${toBengaliNumber(Math.round(STATE.level))}%
-                </div>
-            </div>
-        `;
-    }
-    
-    return currentPhaseHTML + html; 
+    // We only return the list entries here, the status goes to the header
+    return html; 
 }
 
 function updateLevelUI(currentLevel) {
@@ -426,20 +409,19 @@ function updateLevelUI(currentLevel) {
     }
 }
 
-// **Scientific Fix:** Water Level Calculation (Main fix for indicator responsiveness)
+// Water Level Calculation (Dynamic Logic)
 function updateLevelAndPhase(tides) {
     const now = new Date().getTime();
     
-    // **KEY FIX:** Use local fallback data if API data is empty/failed
+    // Use fallback data if API data is empty/failed
     const effectiveTides = tides.length > 0 ? tides : getLocalFallbackTides();
     
     let lastTide = null;
     let nextTide = null;
     
-    // Find the last event and the next event
-    if (effectiveTides.length > 1) { // Need at least 2 events for calculation
+    if (effectiveTides.length > 1) { 
         
-        // 1. Find the events closest to 'now'
+        // Find the event pair that brackets the current time
         for (let i = 0; i < effectiveTides.length; i++) {
             const tideTime = new Date(effectiveTides[i].time).getTime();
             if (tideTime < now) {
@@ -450,12 +432,13 @@ function updateLevelAndPhase(tides) {
             }
         }
         
-        // 2. If nextTide is null, shift the list (e.g., if we are past the last event of the generated day)
-        if (!nextTide && effectiveTides.length > 0) {
-            // Recalculate fallback tides to ensure fresh, forward-looking data
+        // If we are past the last listed event, try regenerating fallback data (edge case)
+        if (!nextTide) {
             const freshFallback = getLocalFallbackTides();
-            lastTide = freshFallback[0] || null;
-            nextTide = freshFallback[1] || null;
+            if (freshFallback.length >= 2) {
+                lastTide = freshFallback[0];
+                nextTide = freshFallback[1];
+            }
         }
 
 
@@ -469,23 +452,22 @@ function updateLevelAndPhase(tides) {
             if (ratio > 1) ratio = 1;
             if (ratio < 0) ratio = 0;
 
-            let levelPercent = 50;
+            let levelPercent;
             
-            // Low to High (Rising Tide/জোয়ারের দিকে)
+            // Low to High (Rising Tide)
             if (lastTide.type.toLowerCase() === 'low' && nextTide.type.toLowerCase() === 'high') {
                 // Cosine wave: 0% (ratio 0) -> 100% (ratio 1)
-                levelPercent = 50 * (1 - Math.cos(ratio * Math.PI)); 
-                levelPercent = levelPercent + 50; // shift 0-50 range to 50-100
+                levelPercent = 50 * (1 - Math.cos(ratio * Math.PI)) + 50; 
                 STATE.levelChangeText = 'উচ্চ জোয়ারের দিকে'; 
             } 
-            // High to Low (Falling Tide/ভাটার দিকে)
+            // High to Low (Falling Tide)
             else if (lastTide.type.toLowerCase() === 'high' && nextTide.type.toLowerCase() === 'low') {
                 // Cosine wave: 100% (ratio 0) -> 0% (ratio 1)
                 levelPercent = 50 * (1 + Math.cos(ratio * Math.PI)); 
                 STATE.levelChangeText = 'নিম্ন ভাটার দিকে'; 
             } else {
-                // Time is at or very near an event, or data is ambiguous
-                levelPercent = lastTide.type.toLowerCase() === 'high' ? 95 : 5;
+                // Near event time
+                levelPercent = lastTide.type.toLowerCase() === 'high' ? 98 : 2;
                 STATE.levelChangeText = 'জলস্তর স্থিতিশীল';
             }
             
@@ -494,13 +476,13 @@ function updateLevelAndPhase(tides) {
             const finalFactor = baseFactor * STATE.moonPhaseFactor; 
             
             let normalizedLevel = levelPercent / 100;
+            // Scale the level based on the factor (Spring/Neap)
             let factoredLevel = (normalizedLevel - 0.5) * 2 * finalFactor; 
             
             STATE.level = Math.max(0, Math.min(100, (factoredLevel / 2 + 0.5) * 100)); 
 
         } else {
-             // If only one or no event is found after filtering
-             STATE.level = lastTide ? (lastTide.type.toLowerCase() === 'high' ? 95 : 5) : 50;
+             STATE.level = lastTide ? (lastTide.type.toLowerCase() === 'high' ? 98 : 2) : 50;
              STATE.levelChangeText = 'জলস্তর স্থিতিশীল';
         }
     } else {
@@ -518,7 +500,7 @@ function buildWidget(state) {
     const timeDisplay = document.getElementById('local-time-display');
     const locationName = document.getElementById('location-name');
     const warningDiv = document.getElementById('api-key-warning');
-    const levelTitle = document.querySelector('.level-title-flex .tide-title-sub');
+    const dynamicPhaseText = document.getElementById('dynamic-phase-text');
     
     document.getElementById('loading-message').style.display = 'none';
 
@@ -526,8 +508,16 @@ function buildWidget(state) {
         tideListContainer.innerHTML = buildTideList(state.tides);
     } 
     
-    if (levelTitle) {
-        // levelTitle.textContent = state.levelChangeText; // (Moved to inner HTML for better layout)
+    if (dynamicPhaseText) {
+        let changeIcon = '';
+        if (state.levelChangeText.includes('জোয়ারের দিকে')) {
+            changeIcon = '<span style="color: #69f0ae;">▲</span>'; 
+        } else if (state.levelChangeText.includes('ভাটার দিকে')) {
+            changeIcon = '<span style="color: #ff8a80;">▼</span>';
+        } else {
+             changeIcon = '<span style="color: #81d4fa;">💧</span>';
+        }
+        dynamicPhaseText.innerHTML = `${changeIcon} ${state.levelChangeText}`;
     }
     
     if (dateDisplay) dateDisplay.textContent = getBengaliDate(new Date());
@@ -537,7 +527,6 @@ function buildWidget(state) {
     // Warning Message Logic
     if (state.tides.length === 0) {
         warningDiv.style.display = 'block';
-        warningDiv.textContent = 'জোয়ার-ভাটার তথ্য বর্তমানে লোড হচ্ছে না (ফলব্যাক ডেটা ব্যবহৃত হচ্ছে)';
     } else {
         warningDiv.style.display = 'none';
     }
@@ -546,9 +535,9 @@ function buildWidget(state) {
 
 // --- Data Fetching Logic (Triple Fallback) ---
 async function loadAllData() {
-    document.getElementById('loading-message').style.display = 'block';
     STATE.tides = [];
     
+    // 1. Fetch Moon Phase (for accurate level scaling)
     await fetchMoonPhase();
 
     // 2. Try loading from Cache
@@ -572,7 +561,7 @@ async function loadAllData() {
              throw new Error('API returned no tide data.');
         }
     } catch (e) {
-        console.warn("Fresh data fetch failed:", e);
+        console.warn("Fresh data fetch failed. Using fallback data for calculations.");
     }
     
     updateLevelAndPhase(STATE.tides);
@@ -580,20 +569,24 @@ async function loadAllData() {
     buildWidget(STATE);
 }
 
-// 30 সেকেন্ড অন্তর UI আপডেট (সময় এবং জলস্তর)
+// 5 সেকেন্ড অন্তর UI আপডেট (সময় এবং জলস্তর)
 function updateUI() {
     const timeDisplay = document.getElementById('local-time-display');
     if (timeDisplay) timeDisplay.textContent = getBengaliTime(new Date());
 
+    // Re-calculate level and phase based on data (even if it's fallback data)
     updateLevelAndPhase(STATE.tides);
     
+    // Rebuild the dynamic parts of the widget
     buildWidget(STATE);
 }
 
 function initializeWidget() {
     loadAllData(); // Initial load
-    updateUIInterval = setInterval(updateUI, 30000); // UI update every 30 seconds
-    updateDataInterval = setInterval(loadAllData, CACHE_EXPIRY_MS); 
+    // UI update every 5 seconds (for smooth clock and level)
+    updateUIInterval = setInterval(updateUI, 5000); 
+    // Data reload every 30 minutes (to check if API is back online)
+    updateDataInterval = setInterval(loadAllData, 1800000); 
 }
 
 window.onload = initializeWidget; 
