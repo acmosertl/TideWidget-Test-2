@@ -70,7 +70,7 @@
     align-items: flex-end;
 }
 
-#dynamic-phase-text { /* Use ID for dynamic text */
+#dynamic-phase-text { 
     color: #cfd8dc; 
     font-size: 0.9em;
     font-weight: bold;
@@ -199,25 +199,23 @@
 
 <script>
 // ---------------------------------
-// JavaScript (Final Version with Interval Fixes)
+// JavaScript (Final and Dynamic Fixes)
 // ---------------------------------
 
 const STATE = {
     lat: 22.5726, // Kolkata
     lng: 88.3639, // Kolkata
     city: "Kolakata",
-    tides: [],
+    tides: [], // Holds API or Cached data
     level: 50,
     isApiWorking: true,
     levelChangeText: 'জলস্তর স্থিতিশীল',
     moonPhaseFactor: 1.0 
 };
 
-// Data Source API (Free)
 const TIDE_API_PRIMARY = `https://tide.dynv6.net/api/tide?lat=${STATE.lat}&lng=${STATE.lng}`;
 const MOON_API = `https://api.open-meteo.com/v1/forecast?latitude=${STATE.lat}&longitude=${STATE.lng}&daily=moon_phase&timezone=auto`;
 
-// Caching variables
 const CACHE_KEY = 'tideWidgetData';
 const DATA_REFRESH_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -242,7 +240,7 @@ function toBengaliNumber(num) {
     return String(num).split('').map(char => map[parseInt(char)] || char).join('');
 }
 
-// --- Caching Logic ---
+// --- Caching Logic (No Change) ---
 function getCachedData() {
     try {
         const cachedData = localStorage.getItem(CACHE_KEY);
@@ -271,14 +269,13 @@ function setCachedData(tides) {
     }
 }
 
-// --- ULTIMATE FALLBACK DATA (Ensure 6 dynamic events) ---
+// --- ULTIMATE FALLBACK DATA (Essential for Dynamic Level when API fails) ---
 function getLocalFallbackTides() {
     const now = new Date();
     const avgTideCycleDurationMs = 6 * 60 * 60 * 1000 + 12.5 * 60 * 1000;
     
     let baseTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 1, 0, 0).getTime(); 
 
-    // Find the closest past High Tide event
     while (baseTime < now.getTime() - avgTideCycleDurationMs) {
         baseTime += avgTideCycleDurationMs * 2; 
     }
@@ -286,7 +283,6 @@ function getLocalFallbackTides() {
         baseTime -= avgTideCycleDurationMs * 2; 
     }
     
-    // Generate events starting from 2 cycles before the found baseTime
     const tides = [];
     let currentTime = baseTime - (2 * avgTideCycleDurationMs);
     
@@ -303,7 +299,7 @@ function getLocalFallbackTides() {
     return tides.filter(tide => new Date(tide.time) > new Date().getTime() - (6 * 60 * 60 * 1000)).slice(0, 6);
 }
 
-// --- Moon Phase Calculation ---
+// --- Moon Phase Calculation (No Change) ---
 async function fetchMoonPhase() {
     try {
         const response = await fetch(MOON_API);
@@ -323,9 +319,8 @@ async function fetchMoonPhase() {
     }
 }
 
-// --- UI Building Functions ---
+// --- UI Building Functions (No Logic Change) ---
 function buildTideList(tides) {
-    // FIX: Always use a dynamic set of data for the list/calculation
     const dataTides = (tides && tides.length > 0) ? tides : getLocalFallbackTides(); 
     
     let html = '';
@@ -398,12 +393,12 @@ function updateLevelUI(currentLevel) {
     }
 }
 
-// Water Level Calculation (Dynamic Logic)
+// FIX: Water Level Calculation (Ensure Dynamic Level even with no API data)
 function updateLevelAndPhase(tides) {
     const now = new Date().getTime();
     
-    // FIX: Use dynamic fallback if API data is missing/failed or old
-    const effectiveTides = tides.length > 0 ? tides : getLocalFallbackTides();
+    // ENSURE dynamic calculation data: Use API/Cached data first, otherwise use fresh Fallback data
+    const effectiveTides = (tides && tides.length > 0) ? tides : getLocalFallbackTides(); 
     
     let lastTide = null;
     let nextTide = null;
@@ -421,7 +416,7 @@ function updateLevelAndPhase(tides) {
             }
         }
         
-        // Fallback for edge case where all listed events are in the past
+        // Final check to prevent static level if array ran out
         if (!nextTide && lastTide) {
             const freshFallback = getLocalFallbackTides();
             if (freshFallback.length >= 2) {
@@ -467,12 +462,11 @@ function updateLevelAndPhase(tides) {
             STATE.level = Math.max(0, Math.min(100, (factoredLevel / 2 + 0.5) * 100)); 
 
         } else {
-             // Default if calculation fails
-             STATE.level = lastTide ? (lastTide.type.toLowerCase() === 'high' ? 98 : 2) : 50;
+             // Fallback to initial 50% only if data is insufficient for calculation
+             STATE.level = 50;
              STATE.levelChangeText = 'জলস্তর স্থিতিশীল';
         }
     } else {
-         // Default if data list is insufficient
          STATE.level = 50;
          STATE.levelChangeText = 'জলস্তর স্থিতিশীল';
     }
@@ -521,64 +515,72 @@ function buildWidget(state) {
 }
 
 
-// --- Data Fetching Logic (Triple Fallback) ---
+// --- Data Fetching Logic ---
 async function loadAllData() {
-    STATE.tides = [];
+    let apiSuccess = false;
     
     await fetchMoonPhase();
 
-    // 2. Try loading from Cache
-    const cachedTides = getCachedData();
-    if (cachedTides) {
-        STATE.tides = cachedTides;
-    }
-
-    // 3. Try fetching fresh data from the Primary API
-    let freshTides = [];
+    // 1. Try fetching fresh data from the Primary API
     try {
         const tideResponse = await fetch(TIDE_API_PRIMARY);
         if (!tideResponse.ok) throw new Error('Primary API call failed');
         const tideData = await tideResponse.json();
-        freshTides = tideData.tides || [];
+        const freshTides = tideData.tides || [];
         
         if (freshTides.length > 0) {
             STATE.tides = freshTides; 
             setCachedData(freshTides); 
+            apiSuccess = true;
         } else {
              throw new Error('API returned no tide data.');
         }
     } catch (e) {
-        console.warn("Fresh data fetch failed. Using fallback data for calculations.");
+        console.warn("Fresh data fetch failed. Trying cache/fallback.");
     }
     
+    // 2. If API failed, try Cache
+    if (!apiSuccess) {
+        const cachedTides = getCachedData();
+        if (cachedTides) {
+            STATE.tides = cachedTides;
+        } else {
+             // 3. If Cache failed, use Fallback (STATE.tides remains [])
+             STATE.tides = [];
+        }
+    }
+    
+    // IMPORTANT: Level calculation MUST happen on every data load
     updateLevelAndPhase(STATE.tides);
     buildWidget(STATE);
 }
 
-// 5 সেকেন্ড অন্তর UI আপডেট (সময় এবং জলস্তর)
+// FIX: UI update function, robust clock and dynamic level check
 function updateUI() {
     const timeDisplay = document.getElementById('local-time-display');
-    // FIX: Ensure clock is updated frequently
+    // Ensure clock is updated frequently
     if (timeDisplay) timeDisplay.textContent = getBengaliTime(new Date()); 
 
-    updateLevelAndPhase(STATE.tides);
+    // Re-calculate level and phase based on data (this is the key to dynamic level)
+    // If STATE.tides is [], updateLevelAndPhase will automatically use fresh getLocalFallbackTides()
+    updateLevelAndPhase(STATE.tides); 
     
     buildWidget(STATE);
 }
 
 function initializeWidget() {
-    // FIX: Clear any existing intervals before starting new ones
+    // Clear any existing intervals before starting new ones
     if (updateUIInterval) clearInterval(updateUIInterval);
     if (updateDataInterval) clearInterval(updateDataInterval);
     
-    loadAllData(); // Initial load
+    loadAllData(); // Initial data load
     
-    // UI update every 5 seconds (for smooth clock and level)
+    // UI update every 5 seconds (for smooth clock and dynamic level)
     updateUIInterval = setInterval(updateUI, 5000); 
     // Data reload every 30 minutes (to check if API is back online)
     updateDataInterval = setInterval(loadAllData, 1800000); 
 }
 
 window.onload = initializeWidget; 
-    </script>
-    
+                 </script>
+                 
