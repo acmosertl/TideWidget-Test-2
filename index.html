@@ -32,14 +32,14 @@
 <style>
 /* ---------------------------------
    CSS: চূড়ান্ত স্টাইল সেটিংস
+   (আগের কোডটিই, যা UI ঠিক করে)
    --------------------------------- */
 .tide-widget {
-    /* Main container styling */
-    background-color: #2e5c6a; /* Dark Teal Background Color */
-    border: 5px solid #795548; /* Chocolate Brown Border */
+    background-color: #2e5c6a; 
+    border: 5px solid #795548; 
     border-radius: 12px;
     padding: 15px;
-    max-width: 300px; /* উইজেটের আকার নির্দিষ্ট করা হলো */
+    max-width: 300px; 
     color: #ffffff;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     margin: 10px auto; 
@@ -49,13 +49,12 @@
 .widget-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-end; /* শিরোনাম এবং জলস্তর শিরোনাম একই সারিতে */
+    align-items: flex-end; 
     margin-bottom: 10px;
     gap: 10px;
 }
 
 .tide-title {
-    /* Main Title: জোয়ার-ভাটা */
     color: #ffeb3b; 
     font-size: 1.3em;
     font-weight: bold;
@@ -64,19 +63,17 @@
 }
 
 .level-title-flex {
-    /* Sub Title: বর্তমান জলস্তর */
     display: flex;
     flex-direction: column;
     align-items: flex-end;
 }
 
 .tide-title-sub {
-    color: #cfd8dc; /* Light Grey */
+    color: #cfd8dc; 
     font-size: 0.8em;
     font-weight: normal;
 }
 
-/* Flex container for the list and the bar */
 .tide-body-flex {
     display: flex;
     gap: 15px;
@@ -93,27 +90,23 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    /* এই র্যাপারটি জলস্তর বারের জন্য প্রয়োজনীয় স্থান নিশ্চিত করবে */
 }
 
-/* জোয়ার-ভাটার এন্ট্রিগুলির বিন্যাস সংশোধন করা হলো */
 .tide-entry {
     display: flex;
-    /* উচ্চ জোয়ার ও সময়কে একই লাইনে রাখবে */
     justify-content: space-between; 
     align-items: center;
     padding: 8px 0;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     transition: background-color 0.3s ease;
-    /* এই সেকশনটি টেক্সট র‍্যাপ হওয়া আটকাবে */
     white-space: nowrap; 
     overflow: hidden;
 }
 
 .tide-info {
-    font-size: 1.0em; /* একটু বড় করা হলো */
+    font-size: 1.0em; 
     color: #cfd8dc;
-    flex-shrink: 0; /* যেন কম্প্রেস না হয় */
+    flex-shrink: 0; 
     display: flex;
     align-items: center;
 }
@@ -122,11 +115,11 @@
     font-size: 1.1em;
     font-weight: bold;
     color: #ffd700;
-    margin-left: 10px; /* স্পেস বাড়ানো হলো */
+    margin-left: 10px; 
 }
 
 .tide-entry-current {
-    background-color: rgba(255, 255, 255, 0.15); /* গাঢ় হাইলাইট */
+    background-color: rgba(255, 255, 255, 0.15); 
     border-radius: 4px;
     padding-left: 5px;
     padding-right: 5px;
@@ -142,12 +135,11 @@
 .indicator-arrow {
     font-size: 1.2em;
     margin-left: 5px;
-    line-height: 1; /* ফন্টের লাইন উচ্চতা ঠিক করা হলো */
+    line-height: 1; 
 }
 
-/* জলস্তর বার (Progress Bar) */
 .level-container {
-    width: 28px; /* একটু চওড়া করা হলো */
+    width: 28px; 
     height: 100%; 
     background-color: #4a7582;
     border-radius: 14px;
@@ -167,17 +159,16 @@
 }
 
 .level-percent {
-    /* পার্সেন্টেজ টেক্সট স্টাইল */
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%) rotate(-90deg);
-    color: #fff; /* White text for visibility */
+    color: #fff; 
     font-size: 0.9em;
     font-weight: bold;
     width: 100px;
     text-align: center;
-    text-shadow: 0 0 3px rgba(0, 0, 0, 0.5); /* টেক্সটকে স্পষ্ট করবে */
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.5); 
 }
 
 .widget-footer {
@@ -202,38 +193,37 @@
 // ---------------------------------
 // JavaScript: ডাটা লোডিং ও UI তৈরি
 // ---------------------------------
-// (পূর্বের সম্পূর্ণ JavaScript কোড এখানে হুবহু থাকবে)
+
+// **এখানে আপনার WorldTides API Key বসান**
+const WORLDTIDES_API_KEY = "YOUR_WORLDTIDES_API_KEY_HERE"; 
 
 const STATE = {
     lat: 22.5726, // Default for Kolkata
     lng: 88.3639, // Default for Kolkata
     city: "Kolakata",
     tides: null,
-    level: 50 // Default level
+    level: 50 
 };
 
-const API_OM = 'https://api.open-meteo.com/v1/forecast?latitude=${STATE.lat}&longitude=${STATE.lng}&daily=moonrise,moonset,moon_phase&timezone=auto';
-const TIDE_API_URL = 'https://tide.dynv6.net/api/tide?lat=${STATE.lat}&lng=${STATE.lng}';
+// API URLs (Primary and Fallback)
+const TIDE_API_PRIMARY = `https://tide.dynv6.net/api/tide?lat=${STATE.lat}&lng=${STATE.lng}`;
+const TIDE_API_FALLBACK = (dateStr) => 
+    `https://www.worldtides.info/api/v2/tides?lat=${STATE.lat}&lon=${STATE.lng}&key=${WORLDTIDES_API_KEY}&start=${dateStr}&length=172800&datum=MLLW&timezone=local&extratides=true`; 
+    
+const MOON_API = `https://api.open-meteo.com/v1/forecast?latitude=${STATE.lat}&longitude=${STATE.lng}&daily=moon_phase&timezone=auto`;
+
 let updateUIInterval; 
 let updateDataInterval; 
 
 function getBengaliTime(date) {
-    const options = { 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        hour12: true 
-    };
+    const options = { hour: '2-digit', minute: '2-digit', hour12: true };
     return new Date(date).toLocaleString('bn-IN', options)
         .replace(/AM/, ' AM').replace(/PM/, ' PM');
 }
 
 function getBengaliDate(date) {
     const d = new Date(date);
-    const options = { 
-        day: '2-digit', 
-        month: '2-digit', 
-        year: 'numeric' 
-    };
+    const options = { day: '2-digit', month: '2-digit', year: 'numeric' };
     return d.toLocaleString('bn-IN', options).replace(/\//g, '-');
 }
 
@@ -250,16 +240,16 @@ function buildTideList(tides) {
     tides.forEach((tide) => {
         const tideTime = new Date(tide.time);
         const timeStr = getBengaliTime(tide.time);
-        const typeStr = tide.type === 'High' ? 'উচ্চ জোয়ার' : 'নিম্ন ভাটা';
+        // Ensure type is capitalized for display
+        const typeStr = tide.type.toLowerCase() === 'high' ? 'উচ্চ জোয়ার' : 'নিম্ন ভাটা'; 
         const waveIcon = '≈'; 
 
-        // Check if this is the next relevant tide
         let isCurrent = !isCurrentTideFound && tideTime > now;
         if (isCurrent) {
             isCurrentTideFound = true;
         }
 
-        const arrowIcon = tide.type === 'High' 
+        const arrowIcon = tide.type.toLowerCase() === 'high' 
             ? '<span class="indicator-arrow arrow-up">▲</span>' 
             : '<span class="indicator-arrow arrow-down">▼</span>';
 
@@ -285,8 +275,6 @@ function updateLevelUI(currentLevel) {
         const percentage = Math.max(0, Math.min(100, Math.round(currentLevel)));
         levelBar.style.height = `${percentage}%`;
         levelPercent.textContent = `${toBengaliNumber(percentage)}%`;
-        
-        // Percentage text will always be white (defined in CSS)
     }
 }
 
@@ -296,11 +284,17 @@ function buildWidget(state) {
     const timeDisplay = document.getElementById('local-time-display');
     const locationName = document.getElementById('location-name');
 
-    if (state.tides && tideListContainer) {
+    if (state.tides && state.tides.length > 0 && tideListContainer) {
         tideListContainer.innerHTML = buildTideList(state.tides);
     } else if (tideListContainer) {
-        // ত্রুটি দেখালে মেসেজ
-        tideListContainer.innerHTML = `<div style="color: #F44336; text-align: center; padding: 20px;">জোয়ার-ভাটার তথ্য লোড হচ্ছে না।</div>`;
+        // API কী না দেওয়া হলে বিশেষ বার্তা
+        if (WORLDTIDES_API_KEY === "YOUR_WORLDTIDES_API_KEY_HERE") {
+             tideListContainer.innerHTML = `<div style="color: #FF6347; text-align: center; padding: 20px;">
+                API কী সেট করুন: <a href="https://www.worldtides.info/register" target="_blank" style="color: #ffeb3b;">ওয়ার্ল্ডটাইডস</a> থেকে কী নিয়ে "YOUR_WORLDTIDES_API_KEY_HERE"-এর বদলে বসান।
+             </div>`;
+        } else {
+             tideListContainer.innerHTML = `<div style="color: #F44336; text-align: center; padding: 20px;">জোয়ার-ভাটার তথ্য লোড হচ্ছে না। API ব্লক হতে পারে।</div>`;
+        }
     }
 
     if (dateDisplay) dateDisplay.textContent = getBengaliDate(new Date());
@@ -310,6 +304,16 @@ function buildWidget(state) {
     updateLevelUI(state.level);
 }
 
+// WorldTides API এর জন্য ডাটা ফরমেট করা
+function formatWorldTides(data) {
+    if (!data || !data.predictions) return [];
+    return data.predictions.map(p => ({
+        time: new Date(p.dt * 1000).toISOString(),
+        type: p.type === 'High' ? 'High' : 'Low'
+    }));
+}
+
+// ডাটা লোড করার প্রধান ফাংশন
 async function loadAllData() {
     document.getElementById('loading-message').style.display = 'block';
 
@@ -317,17 +321,35 @@ async function loadAllData() {
         STATE.lat = 22.5726; 
         STATE.lng = 88.3639;
         STATE.city = "Kolakata"; 
-
-        const tideResponse = await fetch(`https://tide.dynv6.net/api/tide?lat=${STATE.lat}&lng=${STATE.lng}`);
-        if (!tideResponse.ok) throw new Error('Tide API call failed');
-        const tideData = await tideResponse.json();
-
-        const moonResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${STATE.lat}&longitude=${STATE.lng}&daily=moonrise,moonset,moon_phase&timezone=auto`);
-        if (!moonResponse.ok) throw new Error('Moon API call failed');
-        const moonData = await moonResponse.json();
         
-        STATE.tides = tideData.tides || [];
+        // 1. Primary API (dynv6) থেকে চেষ্টা
+        let tides = [];
+        try {
+            const tideResponse = await fetch(TIDE_API_PRIMARY);
+            if (!tideResponse.ok) throw new Error('Primary API call failed');
+            const tideData = await tideResponse.json();
+            tides = tideData.tides || [];
+        } catch (e) {
+            console.warn("Primary API failed, attempting Fallback API.");
+        }
+        
+        // 2. Fallback API (WorldTides) থেকে চেষ্টা (যদি Primary ফেইল করে)
+        if (tides.length === 0 && WORLDTIDES_API_KEY && WORLDTIDES_API_KEY !== "YOUR_WORLDTIDES_API_KEY_HERE") {
+            const today = new Date().toISOString().substring(0, 10);
+            const fallbackResponse = await fetch(TIDE_API_FALLBACK(today));
+            if (!fallbackResponse.ok) throw new Error('Fallback API call failed');
+            const fallbackData = await fallbackResponse.json();
+            tides = formatWorldTides(fallbackData);
+        }
+        
+        STATE.tides = tides;
 
+        // 3. Moon Data Fetch
+        const moonResponse = await fetch(MOON_API);
+        const moonData = await moonResponse.json();
+        const moonPhase = moonData?.daily?.moon_phase[0] || 0.5;
+
+        // 4. Level Calculation
         const now = new Date().getTime();
         let lastTide = null;
         let nextTide = null;
@@ -353,25 +375,23 @@ async function loadAllData() {
             if (ratio < 0) ratio = 0;
 
             let levelPercent;
-            if (lastTide.type === 'Low' && nextTide.type === 'High') {
+            if (lastTide.type.toLowerCase() === 'low' && nextTide.type.toLowerCase() === 'high') {
                 levelPercent = 50 * (1 - Math.cos(ratio * Math.PI)) + 50; 
-            } else if (lastTide.type === 'High' && nextTide.type === 'Low') {
+            } else if (lastTide.type.toLowerCase() === 'high' && nextTide.type.toLowerCase() === 'low') {
                 levelPercent = 50 * (1 + Math.cos(ratio * Math.PI)); 
             } else {
                 levelPercent = 50; 
             }
             
-            const moonPhase = moonData.daily.moon_phase[0] || 0.5;
             const tideRangeMultiplier = 0.5 + Math.abs(0.5 - moonPhase); 
-            
             STATE.level = Math.max(0, Math.min(100, levelPercent * tideRangeMultiplier * 1.5)); 
         } else {
             STATE.level = 50; 
         }
         
     } catch (e) {
-        console.error("Error loading tide data:", e);
-        STATE.tides = null; 
+        console.error("Error loading all tide data:", e);
+        STATE.tides = []; // Empty the list on final failure
         STATE.level = 50; 
     }
 
@@ -379,11 +399,13 @@ async function loadAllData() {
     buildWidget(STATE);
 }
 
+// 30 সেকেন্ড অন্তর UI আপডেট (সময় ও বর্তমান জলস্তর)
 function updateUI() {
     const timeDisplay = document.getElementById('local-time-display');
     if (timeDisplay) timeDisplay.textContent = getBengaliTime(new Date());
 
-    if (STATE.tides) {
+    if (STATE.tides && STATE.tides.length > 0) {
+        // Rerun level calculation logic
         const now = new Date().getTime();
         let lastTide = null;
         let nextTide = null;
@@ -409,9 +431,9 @@ function updateUI() {
             if (ratio < 0) ratio = 0;
 
             let levelPercent;
-            if (lastTide.type === 'Low' && nextTide.type === 'High') {
+            if (lastTide.type.toLowerCase() === 'low' && nextTide.type.toLowerCase() === 'high') {
                 levelPercent = 50 * (1 - Math.cos(ratio * Math.PI)) + 50;
-            } else if (lastTide.type === 'High' && nextTide.type === 'Low') {
+            } else if (lastTide.type.toLowerCase() === 'high' && nextTide.type.toLowerCase() === 'low') {
                 levelPercent = 50 * (1 + Math.cos(ratio * Math.PI)); 
             } else {
                 levelPercent = 50;
@@ -424,6 +446,7 @@ function updateUI() {
 
         updateLevelUI(STATE.level);
         
+        // Highlight the current tide correctly on UI update
         const tideListContainer = document.getElementById('tide-list-container');
         if (tideListContainer) {
              tideListContainer.innerHTML = buildTideList(STATE.tides);
@@ -434,10 +457,11 @@ function updateUI() {
 function initializeWidget() {
     loadAllData(); 
     updateUIInterval = setInterval(updateUI, 30000); 
-    updateDataInterval = setInterval(loadAllData, 3 * 60 * 60 * 1000); 
+    // Data reload interval changed to 4 hours, as WorldTides is rate-limited
+    updateDataInterval = setInterval(loadAllData, 4 * 60 * 60 * 1000); 
 }
 
 window.onload = initializeWidget; 
 
-        </script>
-        
+                     </script>
+    
