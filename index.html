@@ -214,10 +214,12 @@
 document.addEventListener('DOMContentLoaded', function() {
     const API_OM = 'https://api.open-meteo.com/v1/forecast';
     const API_IP = 'https://ipapi.co/json/';
-    const DEFAULT = { lat:22.57, lng:88.36, source:'স্থির স্থানাঙ্ক', city:'কলকাতা' };
+    // ডিফল্ট স্থানাঙ্ক (কলকাতা)
+    const DEFAULT = { lat:22.57, lng:88.36, source:'স্থির স্থানাঙ্ক', city:'কলকাতা' }; 
     const $ = id => document.getElementById(id);
 
-    const FALLBACK_DATA = { tide_anchor_fallback:'20:30' };
+    // জোয়ার-ভাটা হিসেবের জন্য ফলব্যাক সময় (যদি API ব্যর্থ হয়)
+    const FALLBACK_DATA = { tide_anchor_fallback:'20:30' }; 
 
     let STATE = { lat:DEFAULT.lat, lng:DEFAULT.lng, source:DEFAULT.source, city:DEFAULT.city, tides:[] };
     let updateUIInterval = null;
@@ -264,6 +266,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function createGlowArrow(direction,size='1.1em'){
         const arrow=direction==='up'?'▲':'▼';
         const color=direction==='up'?'#32CD32':'#FF4500';
+        // গ্লোয়িং এফেক্টের জন্য টেক্সট শ্যাডো
         const shadow=`0 0 5px ${color},0 0 10px ${color}`; 
         return `<span style="font-size:${size};color:${color};text-shadow:${shadow};margin-left:5px;position:relative;top:${direction==='up'?'-2px':'2px'};">${arrow}</span>`;
     }
@@ -276,9 +279,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const [h,m]=baseTime.split(':').map(Number);
             base=new Date(d.getFullYear(),d.getMonth(),d.getDate(),h,m,0);
         }
+        // জোয়ার থেকে ভাটার সময় প্রায় ৬ ঘণ্টা ১২ মিনিট
         const gap=(6*60+12)*60000; 
         const out=[];
-        const types=['উচ্চ জোয়ার','নিম্ন ভাটা','উচ্চ জোয়ার','নিম্ন ভাটা'];
+        // প্রথম ইভেন্ট উচ্চ জোয়ার ধরে নেওয়া হলো
+        const types=['উচ্চ জোয়ার','নিম্ন ভাটা','উচ্চ জোয়ার','নিম্ন ভাটা']; 
         for(let i=0;i<4;i++){
             let t=new Date(base.getTime()+i*gap);
             out.push({ type:types[i], time:formatToBengali(t,true), level:(i%2===0)?'high':'low', timestamp:t.getTime() });
@@ -286,6 +291,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return out.sort((a,b)=>a.timestamp-b.timestamp);
     }
 
+    // --- সংশোধিত ডাইনামিক লজিক ফিক্স ---
     function getDynamicLevelInfo(tides){
         if(!tides || tides.length < 2) return {level:50,direction:'static',nextEventIndex:-1};
         const now=Date.now();
@@ -296,26 +302,36 @@ document.addEventListener('DOMContentLoaded', function() {
         let next = null;
         
         if (nextIndex === -1) {
+            // যদি দিনের সব ইভেন্ট শেষ হয়ে যায়, তবে শেষ ইভেন্টটি 'past' এবং প্রথম ইভেন্টটি (পরের দিনের) 'next' হবে।
             past = tides[tides.length - 1];
+            
+            // প্রথম ইভেন্টটিকে পরের দিনের জন্য প্রস্তুত করা হলো
             const nextDayTime = new Date(tides[0].timestamp);
             nextDayTime.setDate(nextDayTime.getDate() + 1);
             next = { ...tides[0], timestamp: nextDayTime.getTime() };
-            nextIndex = 0; 
+            
+            nextIndex = 0; // হাইলাইট করবে প্রথম ইভেন্টকে
         } else {
+            // আসন্ন ইভেন্ট পাওয়া গেলে
             next = tides[nextIndex];
+            
+            // তার ঠিক আগের ইভেন্টটি 'past' হবে
             if (nextIndex > 0) {
                 past = tides[nextIndex - 1];
             } else {
+                // দিনের প্রথম ইভেন্টটি যদি আসন্ন হয়, তবে তার 'past' হবে আগের দিনের শেষ ইভেন্ট।
                 const previousDayTime = new Date(tides[tides.length - 1].timestamp);
                 previousDayTime.setDate(previousDayTime.getDate() - 1);
                 past = { ...tides[tides.length - 1], timestamp: previousDayTime.getTime() };
             }
         }
         
+        // এখানে জোয়ার-ভাটার হিসেব শুরু
         if (!past || !next || next.timestamp <= past.timestamp) {
              return {level:50, direction:'static', nextEventIndex: nextIndex };
         }
 
+        // 5% (নিম্ন ভাটা) থেকে 95% (উচ্চ জোয়ার) পর্যন্ত জলস্তর নির্দেশক
         const startLevel = past.level === 'high' ? 95 : 5;
         const endLevel = next.level === 'high' ? 95 : 5;
 
@@ -325,16 +341,23 @@ document.addEventListener('DOMContentLoaded', function() {
         const totalDuration = next.timestamp - past.timestamp;
         const elapsedDuration = now - past.timestamp;
         
+        // Interpolation (রৈখিক অনুমান)
         let ratio = elapsedDuration / totalDuration;
-        ratio = Math.max(0, Math.min(1, ratio));
+        ratio = Math.max(0, Math.min(1, ratio)); // 0 থেকে 1 এর মধ্যে সীমাবদ্ধ রাখা হলো
 
         level = startLevel + ((endLevel - startLevel) * ratio);
         direction = endLevel > startLevel ? 'up' : 'down';
+        
+        // যদি current time next event এর খুব কাছে হয় (ratio > 0.95), তবে level কে end level এর কাছাকাছি রাখা হলো
+        if (ratio > 0.95) {
+             level = endLevel - (endLevel > startLevel ? 1 : -1); 
+        }
 
         level = Math.round(Math.max(5, Math.min(95, level))); 
         
         return { level:level, direction:direction, nextEventIndex:nextIndex };
     }
+    // --- সংশোধিত ডাইনামিক লজিক সমাপ্ত ---
     
     function loadCoordinates(){
         return new Promise((resolve) => {
@@ -387,6 +410,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let html='';
         tides.forEach((t,i)=>{
             const hi=i===info.nextEventIndex;
+            // আসন্ন ইভেন্টে দিকনির্দেশক তীরচিহ্ন, যা বর্তমান অবস্থার দিক নির্দেশ করবে।
             const ar=hi?createGlowArrow(info.direction,'0.9em'):''; 
             html+=`
             <div class="tide-item-compact ${hi?'highlight':''}">
@@ -403,9 +427,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateLiveUI(){
-        // Ensure elements exist before updating (critical fix)
+        // নিশ্চিত করা হলো যে সব DOM উপাদান লোড হয়েছে কিনা
         if(!$('local-time-live') || !$('water-fill') || !$('water-level-text') || !$('tide-events-list') || !$('panel-arrow-indicator')) {
-             console.error("UI elements not found. Stopping live update.");
+             console.error("UI elements not fully available. Stopping live update.");
              return;
         }
 
@@ -417,13 +441,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const dynInfo=getDynamicLevelInfo(STATE.tides);
         const {level,direction}=dynInfo;
         
+        // জলস্তর আপডেট
         $('water-fill').style.height=level+"%";
         
+        // জলস্তর টেক্সট আপডেট
         $('water-level-text').textContent=level+"%";
         $('water-level-text').style.bottom=`calc(${level}% - 8px)`; 
 
+        // জোয়ার-ভাটা তালিকা আপডেট (হাইলাইট ও ইন্ডিকেটর)
         $('tide-events-list').innerHTML=buildTideList(STATE.tides,dynInfo);
         
+        // উপরের তীরচিহ্ন আপডেট
         $('panel-arrow-indicator').innerHTML=direction!=='static'?createGlowArrow(direction,'1.4em'):'';
     }
 
@@ -502,11 +530,14 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error("Critical error during initial load:", error);
             // মারাত্মক ত্রুটি হলে ফলব্যাক বার্তা
-            $('madhabam-tide-widget').innerHTML = `
-                <div style="background-color: #00575e; color: #f7d730; padding: 15px; border-radius: 10px; font-weight: bold; text-align: center;">
-                    জোয়ার-ভাটার তথ্য লোড হচ্ছে না।
-                </div>
-            `;
+            const widgetContainer = $('madhabam-tide-widget');
+            if (widgetContainer) {
+                widgetContainer.innerHTML = `
+                    <div style="background-color: #00575e; color: #f7d730; padding: 15px; border-radius: 10px; font-weight: bold; text-align: center;">
+                        জোয়ার-ভাটার তথ্য লোড হচ্ছে না।
+                    </div>
+                `;
+            }
         }
     }
 
