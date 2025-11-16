@@ -1,5 +1,217 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Madhabam Tide Widget</title>
+
+<style>
+    /* ১. বডি/ব্যাকগ্রাউন্ডের জন্য বেস স্টাইল */
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: sans-serif;
+        color: white;
+        background-color: transparent; 
+    }
+    #madhabam-tide-widget {
+        max-width: 360px;
+        margin: 0 auto;
+        padding: 0;
+    }
+
+    /* ২. ওয়েভ অ্যানিমেশন স্টাইল (অ্যানিমেশন ফিক্স) */
+    .wave{
+        fill:none;
+        stroke:#FFF;
+        stroke-width:2;
+        stroke-linecap:round;
+        stroke-linejoin:round;
+        animation:wave-motion 2s linear infinite alternate; 
+    }
+    @keyframes wave-motion{
+        0%{transform:translateY(0px);}
+        100%{transform:translateY(-2px);}
+    }
+
+    /* ৩. উইজেটের প্রধান প্যানেল স্টাইল */
+    .tide-panel {
+        display: flex;
+        background-color: #00575e; 
+        border-radius: 15px;
+        padding: 15px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        color: #fff;
+        box-sizing: border-box; 
+        position: relative; 
+    }
+
+    /* ৪. জলস্তর বার স্টাইল */
+    .level-indicator-container {
+        position: absolute; 
+        right: 15px; 
+        top: 15px;
+        bottom: 15px; 
+        width: 40px;
+        display: flex;
+        align-items: flex-end;
+        z-index: 10;
+    }
+
+    .level-indicator-bar {
+        width: 25px;
+        height: 100%; 
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        position: relative; 
+        overflow: hidden;
+    }
+
+    .water-fill {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background: linear-gradient(to top, #36aee0, #7ec0ee); 
+        transition: height 0.5s ease-out; 
+    }
+
+    /* ৫. জলস্তর টেক্সট স্টাইল (ডাইনামিক পজিশনিং) */
+    .water-level-text {
+        position: absolute;
+        right: 45px; /* বারের বাম দিকে */
+        color: #000;
+        font-size: 0.8em; 
+        font-weight: bold;
+        z-index: 10;
+        text-shadow: 0 0 2px #fff;
+        transform: translateY(50%); 
+        transition: bottom 0.5s ease-out; /* স্মুথ মুভমেন্ট */
+    }
+
+    /* ৬. বাম কন্টেন্ট স্টাইল */
+    .tide-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding-right: 20px; 
+        max-width: calc(100% - 40px - 20px - 15px);
+    }
+
+    .tide-header-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        margin-bottom: 15px;
+        font-weight: bold;
+    }
+
+    .tide-header-title {
+        font-size: 1.5em; 
+        color: #f7d730; 
+    }
+    .tide-header-section > div:last-child {
+        text-align:right;
+        font-size:0.7em;
+        line-height: 1.2;
+    }
+
+    .tide-events-list {
+        flex-grow: 1;
+    }
+
+    .tide-item-compact {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 0; 
+        border-bottom: 1px dotted rgba(255, 255, 255, 0.2);
+    }
+    .tide-item-compact:last-child {
+        border-bottom: none;
+    }
+
+    .tide-label-group {
+        display: flex;
+        align-items: center;
+    }
+
+    .tide-text-stack {
+        display: flex;
+        flex-direction: column;
+        margin-left: 10px;
+    }
+
+    .tide-type-value {
+        font-size: 1em;
+        font-weight: bold;
+        color: #ffffff;
+    }
+
+    .tide-time-value {
+        font-size: 1.1em;
+        font-weight: bold;
+        color: #f7d730;
+    }
+    
+    /* ৭. হাইলাইট স্টাইল */
+    .highlight {
+        background-color: rgba(255, 255, 255, 0.2); 
+        margin: 0 -15px; 
+        padding: 6px 15px; 
+        border-radius: 4px;
+    }
+    .highlight .tide-item-compact {
+        border-bottom: none;
+        padding: 0;
+    }
+    .highlight .tide-text-stack {
+        margin-left: 10px; 
+    }
+
+    /* ৮. ফুটার স্টাইল */
+    .footer-tags-section {
+        margin-top: 15px;
+        font-size: 0.85em;
+        line-height: 1.4;
+        display: flex; 
+        flex-wrap: wrap; 
+        justify-content: space-between; 
+    }
+    .tide-date-footer {
+        margin-bottom: 3px;
+        width: 100%; 
+    }
+    .location-time-tag {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        width: 100%; 
+    }
+    .location-time-tag span {
+        color: #f7d730;
+    }
+    
+    .tide-icon-svg {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        margin-right: 5px;
+    }
+</style>
+</head>
+
+<body>
+
+<div id="madhabam-tide-widget" style="max-width:300px;">
+    <div style="background-color: #00575e; color: #f7d730; padding: 15px; border-radius: 10px; font-weight: bold; text-align: center;">
+        তথ্য লোড হচ্ছে...
+    </div>
+</div>
+
 <script>
-(function(){
+document.addEventListener('DOMContentLoaded', function() {
     const API_OM = 'https://api.open-meteo.com/v1/forecast';
     const API_IP = 'https://ipapi.co/json/';
     const DEFAULT = { lat:22.57, lng:88.36, source:'স্থির স্থানাঙ্ক', city:'কলকাতা' };
@@ -124,16 +336,15 @@
         return { level:level, direction:direction, nextEventIndex:nextIndex };
     }
     
-    // --- White Screen ফিক্স এবং ফলব্যাক নিশ্চিত করা হলো ---
     function loadCoordinates(){
         return new Promise((resolve) => {
-            const ipFallback = (cityOverride) => {
+            const ipFallback = () => {
                 fetch(API_IP).then(r => r.json()).then(j => {
                     resolve({
                         lat: j.latitude || DEFAULT.lat,
                         lng: j.longitude || DEFAULT.lng,
                         source: 'IP API',
-                        city: cityOverride || j.city || DEFAULT.city 
+                        city: j.city || DEFAULT.city 
                     });
                 }).catch(e => {
                     console.error("IP API error, using default.", e);
@@ -152,7 +363,7 @@
                             city: j.city || 'আপনার অবস্থান'
                         });
                     }).catch(e => {
-                        console.error("IP API (for city) failed. Using GPS coords.", e);
+                        console.warn("IP API (for city) failed. Using GPS coords.", e);
                         resolve({
                             lat: position.coords.latitude,
                             lng: position.coords.longitude,
@@ -171,8 +382,6 @@
             }
         });
     }
-    // --- White Screen ফিক্স সমাপ্ত ---
-
 
     function buildTideList(tides,info){
         let html='';
@@ -194,6 +403,12 @@
     }
 
     function updateLiveUI(){
+        // Ensure elements exist before updating (critical fix)
+        if(!$('local-time-live') || !$('water-fill') || !$('water-level-text') || !$('tide-events-list') || !$('panel-arrow-indicator')) {
+             console.error("UI elements not found. Stopping live update.");
+             return;
+        }
+
         if(!STATE.tides.length) return;
         
         const currentTime=new Date();
@@ -252,6 +467,7 @@
 
     async function loadAllData(){
         try {
+            // ১. ডেটা লোড
             const coords=await loadCoordinates();
             STATE.lat=coords.lat; STATE.lng=coords.lng; STATE.city=coords.city;
             
@@ -267,12 +483,16 @@
 
             STATE.tides=approxTides(moon);
             
-            // রেন্ডারিং শুরু করা হলো
-            $('madhabam-tide-widget').innerHTML=buildWidget(STATE);
+            // ২. রেন্ডারিং শুরু
+            const widgetContainer = $('madhabam-tide-widget');
+            if (widgetContainer) {
+                widgetContainer.innerHTML=buildWidget(STATE);
+            } else {
+                console.error("Widget container #madhabam-tide-widget not found.");
+                return;
+            }
 
-            // শহর/স্থান নাম আপডেট
-            // document.querySelector('.location-time-tag span').textContent = STATE.city; // এটি এখন buildWidget এ করা হচ্ছে।
-
+            // ৩. লাইভ আপডেট শুরু
             if(updateUIInterval) clearInterval(updateUIInterval);
             updateUIInterval=setInterval(updateLiveUI,100); 
             
@@ -291,6 +511,8 @@
     }
 
     loadAllData();
-})();
-            </script>
-            
+});
+</script>
+
+</body>
+</html>
