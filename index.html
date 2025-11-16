@@ -7,7 +7,6 @@
     </div>
 
     <div class="tide-body-flex">
-        
         <div id="tide-list-container" class="tide-list-container">
             <div id="loading-message" style="color: #ffeb3b; text-align: center; padding: 20px;">
                 জোয়ার-ভাটার তথ্য লোড হচ্ছে...
@@ -26,13 +25,16 @@
         আজ: <strong id="current-date-display"></strong> | 
         স্থান: <strong id="location-name">Kolakata</strong> |
         স্থানীয় সময়: <strong id="local-time-display"></strong>
+        
+        <div id="api-key-warning" style="display: none; color: #ffeb3b; font-size: 0.8em; margin-top: 5px; padding-top: 5px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+             জোয়ার-ভাটার তথ্য বর্তমানে লোড হচ্ছে না (সোর্স ডাউন)।
+        </div>
     </div>
 </div>
 
 <style>
 /* ---------------------------------
-   CSS: চূড়ান্ত স্টাইল সেটিংস
-   (আগের কোডটিই, যা UI ঠিক করে)
+   CSS: (ডিজাইনটি অক্ষুণ্ণ রাখা হলো)
    --------------------------------- */
 .tide-widget {
     background-color: #2e5c6a; 
@@ -191,30 +193,30 @@
 
 <script>
 // ---------------------------------
-// JavaScript: ডাটা লোডিং ও UI তৈরি
+// JavaScript: ক্যাশিং এবং ফ্রি API সোর্সিং লজিক
 // ---------------------------------
 
-// **এখানে আপনার WorldTides API Key বসান**
-const WORLDTIDES_API_KEY = "YOUR_WORLDTIDES_API_KEY_HERE"; 
-
 const STATE = {
-    lat: 22.5726, // Default for Kolkata
-    lng: 88.3639, // Default for Kolkata
+    lat: 22.5726, // Kolkata
+    lng: 88.3639, // Kolkata
     city: "Kolakata",
-    tides: null,
-    level: 50 
+    tides: [],
+    level: 50,
+    isApiWorking: true
 };
 
-// API URLs (Primary and Fallback)
+// Data Source API (Free)
 const TIDE_API_PRIMARY = `https://tide.dynv6.net/api/tide?lat=${STATE.lat}&lng=${STATE.lng}`;
-const TIDE_API_FALLBACK = (dateStr) => 
-    `https://www.worldtides.info/api/v2/tides?lat=${STATE.lat}&lon=${STATE.lng}&key=${WORLDTIDES_API_KEY}&start=${dateStr}&length=172800&datum=MLLW&timezone=local&extratides=true`; 
-    
 const MOON_API = `https://api.open-meteo.com/v1/forecast?latitude=${STATE.lat}&longitude=${STATE.lng}&daily=moon_phase&timezone=auto`;
+
+// Caching variables
+const CACHE_KEY = 'tideWidgetData';
+const CACHE_EXPIRY_MS = 4 * 60 * 60 * 1000; // 4 hours Cache time
 
 let updateUIInterval; 
 let updateDataInterval; 
 
+// --- Utility Functions ---
 function getBengaliTime(date) {
     const options = { hour: '2-digit', minute: '2-digit', hour12: true };
     return new Date(date).toLocaleString('bn-IN', options)
@@ -232,18 +234,66 @@ function toBengaliNumber(num) {
     return String(num).split('').map(char => map[parseInt(char)] || char).join('');
 }
 
+// --- Caching Logic ---
+function getCachedData() {
+    try {
+        const cachedData = localStorage.getItem(CACHE_KEY);
+        if (!cachedData) return null;
+
+        const data = JSON.parse(cachedData);
+        if (data.timestamp && data.timestamp > new Date().getTime()) {
+            console.log("Using valid cached data.");
+            return data.tides; // Cache is valid and not expired
+        }
+        // Cache expired
+        return null;
+    } catch (e) {
+        console.error("Error retrieving/parsing cached data:", e);
+        return null;
+    }
+}
+
+function setCachedData(tides) {
+    try {
+        const expiryTimestamp = new Date().getTime() + CACHE_EXPIRY_MS;
+        const data = {
+            timestamp: expiryTimestamp,
+            tides: tides
+        };
+        localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+        console.log("New data cached successfully.");
+    } catch (e) {
+        console.error("Error setting cached data:", e);
+    }
+}
+
+// --- Dummy Data (To maintain UI structure when no real data is available) ---
+function getDummyTides() {
+    const now = new Date();
+    // Default values for display, will be highlighted based on current time
+    return [
+        { time: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 1, 0, 0).toISOString(), type: 'High' },
+        { time: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 7, 42, 0).toISOString(), type: 'Low' },
+        { time: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 13, 54, 0).toISOString(), type: 'High' },
+        { time: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 19, 36, 0).toISOString(), type: 'Low' }
+    ].sort((a, b) => new Date(a.time) - new Date(b.time));
+}
+
+// --- UI Building Functions ---
 function buildTideList(tides) {
+    const dataTides = (tides && tides.length > 0) ? tides : getDummyTides();
+    
     let html = '';
     const now = new Date();
     let isCurrentTideFound = false;
 
-    tides.forEach((tide) => {
+    dataTides.forEach((tide) => {
         const tideTime = new Date(tide.time);
         const timeStr = getBengaliTime(tide.time);
-        // Ensure type is capitalized for display
         const typeStr = tide.type.toLowerCase() === 'high' ? 'উচ্চ জোয়ার' : 'নিম্ন ভাটা'; 
         const waveIcon = '≈'; 
 
+        // Current Tide Highlight Logic
         let isCurrent = !isCurrentTideFound && tideTime > now;
         if (isCurrent) {
             isCurrentTideFound = true;
@@ -283,73 +333,84 @@ function buildWidget(state) {
     const dateDisplay = document.getElementById('current-date-display');
     const timeDisplay = document.getElementById('local-time-display');
     const locationName = document.getElementById('location-name');
+    const warningDiv = document.getElementById('api-key-warning');
+    
+    document.getElementById('loading-message').style.display = 'none';
 
-    if (state.tides && state.tides.length > 0 && tideListContainer) {
+    // 1. Build Tide List (uses real data or dummy data)
+    if (tideListContainer) {
         tideListContainer.innerHTML = buildTideList(state.tides);
-    } else if (tideListContainer) {
-        // API কী না দেওয়া হলে বিশেষ বার্তা
-        if (WORLDTIDES_API_KEY === "YOUR_WORLDTIDES_API_KEY_HERE") {
-             tideListContainer.innerHTML = `<div style="color: #FF6347; text-align: center; padding: 20px;">
-                API কী সেট করুন: <a href="https://www.worldtides.info/register" target="_blank" style="color: #ffeb3b;">ওয়ার্ল্ডটাইডস</a> থেকে কী নিয়ে "YOUR_WORLDTIDES_API_KEY_HERE"-এর বদলে বসান।
-             </div>`;
-        } else {
-             tideListContainer.innerHTML = `<div style="color: #F44336; text-align: center; padding: 20px;">জোয়ার-ভাটার তথ্য লোড হচ্ছে না। API ব্লক হতে পারে।</div>`;
-        }
-    }
+    } 
 
+    // 2. Update Footer Info and Level
     if (dateDisplay) dateDisplay.textContent = getBengaliDate(new Date());
     if (timeDisplay) timeDisplay.textContent = getBengaliTime(new Date());
     if (locationName) locationName.textContent = state.city;
     
     updateLevelUI(state.level);
+    
+    // 3. Handle Warning Message
+    // Show warning only if no real data (STATE.tides.length === 0)
+    if (state.tides.length === 0) {
+        warningDiv.style.display = 'block';
+    } else {
+        warningDiv.style.display = 'none';
+    }
 }
 
-// WorldTides API এর জন্য ডাটা ফরমেট করা
-function formatWorldTides(data) {
-    if (!data || !data.predictions) return [];
-    return data.predictions.map(p => ({
-        time: new Date(p.dt * 1000).toISOString(),
-        type: p.type === 'High' ? 'High' : 'Low'
-    }));
-}
 
-// ডাটা লোড করার প্রধান ফাংশন
+// --- Data Fetching Logic (Prioritized with Caching) ---
 async function loadAllData() {
     document.getElementById('loading-message').style.display = 'block';
+    STATE.isApiWorking = true;
+    STATE.tides = [];
+    let tidesLoaded = false;
+    
+    // 1. Try loading from Cache first
+    const cachedTides = getCachedData();
+    if (cachedTides) {
+        STATE.tides = cachedTides;
+        tidesLoaded = true;
+        // Proceed to update UI based on cache immediately
+        updateUI(); 
+    }
 
+    // 2. Try fetching fresh data from the free API (dynv6)
+    let freshTides = [];
+    let fetchSuccessful = false;
     try {
-        STATE.lat = 22.5726; 
-        STATE.lng = 88.3639;
-        STATE.city = "Kolakata"; 
+        const tideResponse = await fetch(TIDE_API_PRIMARY);
+        if (!tideResponse.ok) throw new Error('Primary API call failed');
+        const tideData = await tideResponse.json();
+        freshTides = tideData.tides || [];
         
-        // 1. Primary API (dynv6) থেকে চেষ্টা
-        let tides = [];
+        if (freshTides.length > 0) {
+            fetchSuccessful = true;
+            STATE.tides = freshTides; // Use fresh data
+            setCachedData(freshTides); // Cache the fresh data
+            console.log("Data loaded successfully from dynv6 API and cached.");
+        } else {
+             throw new Error('API returned no tide data.');
+        }
+    } catch (e) {
+        console.warn("Fresh data fetch failed:", e);
+        if (!tidesLoaded) {
+            // If no fresh data AND no valid cache, then API is considered down.
+            STATE.isApiWorking = false;
+        }
+    }
+    
+    // 3. Moon Data Fetch and Level Calculation
+    if (STATE.tides.length > 0) {
+        let moonPhase = 0.5;
         try {
-            const tideResponse = await fetch(TIDE_API_PRIMARY);
-            if (!tideResponse.ok) throw new Error('Primary API call failed');
-            const tideData = await tideResponse.json();
-            tides = tideData.tides || [];
-        } catch (e) {
-            console.warn("Primary API failed, attempting Fallback API.");
+            const moonResponse = await fetch(MOON_API);
+            const moonData = await moonResponse.json();
+            moonPhase = moonData?.daily?.moon_phase[0] || 0.5;
+        } catch(e) {
+            console.warn("Moon API failed, using default moon phase.");
         }
         
-        // 2. Fallback API (WorldTides) থেকে চেষ্টা (যদি Primary ফেইল করে)
-        if (tides.length === 0 && WORLDTIDES_API_KEY && WORLDTIDES_API_KEY !== "YOUR_WORLDTIDES_API_KEY_HERE") {
-            const today = new Date().toISOString().substring(0, 10);
-            const fallbackResponse = await fetch(TIDE_API_FALLBACK(today));
-            if (!fallbackResponse.ok) throw new Error('Fallback API call failed');
-            const fallbackData = await fallbackResponse.json();
-            tides = formatWorldTides(fallbackData);
-        }
-        
-        STATE.tides = tides;
-
-        // 3. Moon Data Fetch
-        const moonResponse = await fetch(MOON_API);
-        const moonData = await moonResponse.json();
-        const moonPhase = moonData?.daily?.moon_phase[0] || 0.5;
-
-        // 4. Level Calculation
         const now = new Date().getTime();
         let lastTide = null;
         let nextTide = null;
@@ -389,23 +450,26 @@ async function loadAllData() {
             STATE.level = 50; 
         }
         
-    } catch (e) {
-        console.error("Error loading all tide data:", e);
-        STATE.tides = []; // Empty the list on final failure
-        STATE.level = 50; 
+        STATE.isApiWorking = true;
+    } else {
+        // If no cache, and fetch failed
+        STATE.level = 50;
+        STATE.isApiWorking = false;
     }
 
+    // Final UI update
     document.getElementById('loading-message').style.display = 'none';
     buildWidget(STATE);
 }
 
-// 30 সেকেন্ড অন্তর UI আপডেট (সময় ও বর্তমান জলস্তর)
+// 30 সেকেন্ড অন্তর UI আপডেট (সময় এবং জলস্তর)
 function updateUI() {
+    // Only update time and re-calculate level, fetching only happens in loadAllData
     const timeDisplay = document.getElementById('local-time-display');
     if (timeDisplay) timeDisplay.textContent = getBengaliTime(new Date());
 
     if (STATE.tides && STATE.tides.length > 0) {
-        // Rerun level calculation logic
+        // Recalculate level based on previously loaded STATE.tides
         const now = new Date().getTime();
         let lastTide = null;
         let nextTide = null;
@@ -445,23 +509,34 @@ function updateUI() {
         }
 
         updateLevelUI(STATE.level);
-        
-        // Highlight the current tide correctly on UI update
-        const tideListContainer = document.getElementById('tide-list-container');
-        if (tideListContainer) {
-             tideListContainer.innerHTML = buildTideList(STATE.tides);
+    } else {
+        // Data failed to load, keep UI static with default level
+        updateLevelUI(50);
+    }
+    
+    // Always rebuild the list (to update highlighting, or use dummy)
+    const tideListContainer = document.getElementById('tide-list-container');
+    if (tideListContainer) {
+         tideListContainer.innerHTML = buildTideList(STATE.tides);
+    }
+    
+    // Update footer message
+    const warningDiv = document.getElementById('api-key-warning');
+    if (warningDiv) {
+        if (STATE.tides.length === 0) {
+            warningDiv.style.display = 'block';
+        } else {
+            warningDiv.style.display = 'none';
         }
     }
 }
 
 function initializeWidget() {
-    loadAllData(); 
-    updateUIInterval = setInterval(updateUI, 30000); 
-    // Data reload interval changed to 4 hours, as WorldTides is rate-limited
-    updateDataInterval = setInterval(loadAllData, 4 * 60 * 60 * 1000); 
+    loadAllData(); // Initial load (tries cache, then fetch)
+    updateUIInterval = setInterval(updateUI, 30000); // UI update every 30 seconds
+    updateDataInterval = setInterval(loadAllData, CACHE_EXPIRY_MS); // Full data reload every 4 hours
 }
 
 window.onload = initializeWidget; 
 
-                     </script>
-    
+</script>
