@@ -1,5 +1,10 @@
 <div class="tide-widget">
-    <div class="tide-title">জোয়ার-ভাটা</div>
+    <div class="widget-header">
+        <div class="tide-title">জোয়ার-ভাটা</div>
+        <div class="level-title-flex">
+            <div class="tide-title-sub">বর্তমান জলস্তর</div> 
+        </div>
+    </div>
 
     <div class="tide-body-flex">
         
@@ -10,12 +15,10 @@
         </div>
 
         <div class="level-indicator-wrapper">
-            <div class="tide-title-sub">বর্তমান জলস্তর</div>
             <div id="level-container" class="level-container">
                 <div id="level-bar" class="level-bar"></div>
-                <div id="level-percent" class="level-percent"></div>
+                <div id="level-percent" class="level-percent"></div> 
             </div>
-            
         </div>
     </div>
 
@@ -28,29 +31,49 @@
 
 <style>
 /* ---------------------------------
-   CSS: স্টাইল সেটিংস
+   CSS: চূড়ান্ত স্টাইল সেটিংস
    --------------------------------- */
 .tide-widget {
-    /* Main container styling, using the brown from user's preference */
+    /* Main container styling */
     background-color: #2e5c6a; /* Dark Teal Background Color */
     border: 5px solid #795548; /* Chocolate Brown Border */
     border-radius: 12px;
     padding: 15px;
-    max-width: 300px;
-    color: #ffffff; /* White text for contrast */
+    max-width: 300px; /* উইজেটের আকার নির্দিষ্ট করা হলো */
+    color: #ffffff;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-    margin: 10px auto; /* Centering the widget for display */
-    font-family: Arial, sans-serif; /* Fallback for Bengali text */
+    margin: 10px auto; 
+    font-family: Arial, sans-serif; 
 }
 
-.tide-title, .tide-title-sub {
-    /* Title style (High/Low Tide) */
-    color: #ffeb3b; /* Yellow/Gold text for heading */
+.widget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end; /* শিরোনাম এবং জলস্তর শিরোনাম একই সারিতে */
+    margin-bottom: 10px;
+    gap: 10px;
+}
+
+.tide-title {
+    /* Main Title: জোয়ার-ভাটা */
+    color: #ffeb3b; 
     font-size: 1.3em;
     font-weight: bold;
-    margin-bottom: 10px;
-    display: block;
-    text-align: center;
+    flex-grow: 1;
+    text-align: left;
+}
+
+.level-title-flex {
+    /* Sub Title: বর্তমান জলস্তর */
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.tide-title-sub {
+    color: #cfd8dc; /* Light Grey */
+    font-size: 0.8em;
+    font-weight: normal;
 }
 
 /* Flex container for the list and the bar */
@@ -58,106 +81,104 @@
     display: flex;
     gap: 15px;
     align-items: stretch;
-    min-height: 200px; /* Ensures the bar has height */
+    min-height: 200px; 
     margin-bottom: 10px;
 }
 
 .tide-list-container {
-    flex-grow: 1; /* List takes up most of the space */
+    flex-grow: 1; 
 }
 
 .level-indicator-wrapper {
     display: flex;
     flex-direction: column;
     align-items: center;
+    /* এই র্যাপারটি জলস্তর বারের জন্য প্রয়োজনীয় স্থান নিশ্চিত করবে */
 }
 
-.level-indicator-wrapper .tide-title-sub {
-    font-size: 0.8em;
-    font-weight: normal;
-    margin-bottom: 5px;
-    color: #cfd8dc;
-}
-
-.level-container {
-    width: 25px;
-    height: 100%; /* Important for stretching */
-    background-color: #4a7582;
-    border-radius: 12px;
-    overflow: hidden;
-    position: relative;
-    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
-}
-
-.level-bar {
-    width: 100%;
-    /* Blue gradient from light to dark */
-    background: linear-gradient(to top, #03a9f4, #81d4fa); 
-    position: absolute;
-    bottom: 0;
-    height: 0%; /* Initial state */
-    transition: height 1s ease-in-out;
-}
-
-.level-percent {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) rotate(-90deg);
-    color: #000;
-    font-size: 0.8em;
-    font-weight: bold;
-    width: 100px; /* To hold rotated text */
-    text-align: center;
-    /* Optional: Hide percentage initially if level is very low */
-    opacity: 0.8; 
-}
-
-/* Styling for individual tide entries created by JS */
+/* জোয়ার-ভাটার এন্ট্রিগুলির বিন্যাস সংশোধন করা হলো */
 .tide-entry {
     display: flex;
+    /* উচ্চ জোয়ার ও সময়কে একই লাইনে রাখবে */
+    justify-content: space-between; 
     align-items: center;
-    justify-content: space-between;
     padding: 8px 0;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
-    background-color: transparent; /* Default state */
     transition: background-color 0.3s ease;
-}
-
-.tide-entry-current {
-    /* Highlight for the current or next relevant tide */
-    background-color: rgba(255, 255, 255, 0.1); 
-    border-radius: 4px;
-    padding-left: 5px;
-    padding-right: 5px;
+    /* এই সেকশনটি টেক্সট র‍্যাপ হওয়া আটকাবে */
+    white-space: nowrap; 
+    overflow: hidden;
 }
 
 .tide-info {
-    font-size: 0.9em;
+    font-size: 1.0em; /* একটু বড় করা হলো */
     color: #cfd8dc;
-    flex-grow: 1;
+    flex-shrink: 0; /* যেন কম্প্রেস না হয় */
+    display: flex;
+    align-items: center;
 }
 
 .tide-time {
     font-size: 1.1em;
     font-weight: bold;
-    color: #ffd700; /* Gold color for time */
+    color: #ffd700;
+    margin-left: 10px; /* স্পেস বাড়ানো হলো */
+}
+
+.tide-entry-current {
+    background-color: rgba(255, 255, 255, 0.15); /* গাঢ় হাইলাইট */
+    border-radius: 4px;
+    padding-left: 5px;
+    padding-right: 5px;
+    margin: 2px 0;
 }
 
 .wave-icon {
     margin-right: 8px;
     font-size: 1.1em;
-    color: #81d4fa; /* Light blue wave icon */
+    color: #81d4fa; 
 }
 
 .indicator-arrow {
     font-size: 1.2em;
     margin-left: 5px;
-    transition: transform 0.3s ease-in-out;
+    line-height: 1; /* ফন্টের লাইন উচ্চতা ঠিক করা হলো */
 }
 
-.arrow-up { color: #4CAF50; } /* Green for High Tide */
-.arrow-down { color: #F44336; } /* Red for Low Tide */
+/* জলস্তর বার (Progress Bar) */
+.level-container {
+    width: 28px; /* একটু চওড়া করা হলো */
+    height: 100%; 
+    background-color: #4a7582;
+    border-radius: 14px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.level-bar {
+    width: 100%;
+    background: linear-gradient(to top, #03a9f4, #81d4fa); 
+    position: absolute;
+    bottom: 0;
+    height: 0%; 
+    transition: height 1s ease-in-out;
+}
+
+.level-percent {
+    /* পার্সেন্টেজ টেক্সট স্টাইল */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-90deg);
+    color: #fff; /* White text for visibility */
+    font-size: 0.9em;
+    font-weight: bold;
+    width: 100px;
+    text-align: center;
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.5); /* টেক্সটকে স্পষ্ট করবে */
+}
 
 .widget-footer {
     border-top: 1px solid rgba(255, 255, 255, 0.2);
@@ -172,9 +193,8 @@
     color: #ffeb3b;
 }
 
-/* Utility Class for Bengali Numbers */
 .bengali-number {
-    font-family: 'Noto Sans Bengali', sans-serif; /* Use a font that correctly displays Bengali numerals */
+    font-family: 'Noto Sans Bengali', sans-serif; 
 }
 </style>
 
@@ -182,22 +202,21 @@
 // ---------------------------------
 // JavaScript: ডাটা লোডিং ও UI তৈরি
 // ---------------------------------
+// (পূর্বের সম্পূর্ণ JavaScript কোড এখানে হুবহু থাকবে)
 
-// State Management (ডাটা ধরে রাখার জন্য)
 const STATE = {
     lat: 22.5726, // Default for Kolkata
     lng: 88.3639, // Default for Kolkata
-    city: "Kolkata",
+    city: "Kolakata",
     tides: null,
     level: 50 // Default level
 };
 
 const API_OM = 'https://api.open-meteo.com/v1/forecast?latitude=${STATE.lat}&longitude=${STATE.lng}&daily=moonrise,moonset,moon_phase&timezone=auto';
 const TIDE_API_URL = 'https://tide.dynv6.net/api/tide?lat=${STATE.lat}&lng=${STATE.lng}';
-let updateUIInterval; // UI আপডেটের জন্য
-let updateDataInterval; // ডাটা পুনরায় লোড করার জন্য
+let updateUIInterval; 
+let updateDataInterval; 
 
-// বাংলা মাসের নাম ও সংখ্যা রূপান্তর ফাংশন
 function getBengaliTime(date) {
     const options = { 
         hour: '2-digit', 
@@ -223,17 +242,16 @@ function toBengaliNumber(num) {
     return String(num).split('').map(char => map[parseInt(char)] || char).join('');
 }
 
-// UI তৈরি করার ফাংশন
 function buildTideList(tides) {
     let html = '';
     const now = new Date();
     let isCurrentTideFound = false;
 
-    tides.forEach((tide, index) => {
+    tides.forEach((tide) => {
         const tideTime = new Date(tide.time);
         const timeStr = getBengaliTime(tide.time);
         const typeStr = tide.type === 'High' ? 'উচ্চ জোয়ার' : 'নিম্ন ভাটা';
-        const waveIcon = '≈'; // Simple wave icon
+        const waveIcon = '≈'; 
 
         // Check if this is the next relevant tide
         let isCurrent = !isCurrentTideFound && tideTime > now;
@@ -259,72 +277,61 @@ function buildTideList(tides) {
     return html;
 }
 
-// বর্তমান জলস্তর আপডেট করার ফাংশন
 function updateLevelUI(currentLevel) {
     const levelBar = document.getElementById('level-bar');
     const levelPercent = document.getElementById('level-percent');
 
     if (levelBar && levelPercent) {
-        // Ensure level is between 0 and 100
         const percentage = Math.max(0, Math.min(100, Math.round(currentLevel)));
         levelBar.style.height = `${percentage}%`;
         levelPercent.textContent = `${toBengaliNumber(percentage)}%`;
+        
+        // Percentage text will always be white (defined in CSS)
     }
 }
 
-// UI রেন্ডার করার ফাংশন
 function buildWidget(state) {
     const tideListContainer = document.getElementById('tide-list-container');
     const dateDisplay = document.getElementById('current-date-display');
     const timeDisplay = document.getElementById('local-time-display');
     const locationName = document.getElementById('location-name');
 
-    // UI Render
     if (state.tides && tideListContainer) {
         tideListContainer.innerHTML = buildTideList(state.tides);
     } else if (tideListContainer) {
+        // ত্রুটি দেখালে মেসেজ
         tideListContainer.innerHTML = `<div style="color: #F44336; text-align: center; padding: 20px;">জোয়ার-ভাটার তথ্য লোড হচ্ছে না।</div>`;
     }
 
-    // Footer Update
     if (dateDisplay) dateDisplay.textContent = getBengaliDate(new Date());
     if (timeDisplay) timeDisplay.textContent = getBengaliTime(new Date());
     if (locationName) locationName.textContent = state.city;
     
-    // Level Update (Initial/Fallback)
     updateLevelUI(state.level);
 }
 
-// ডাটা লোড করার প্রধান ফাংশন
 async function loadAllData() {
     document.getElementById('loading-message').style.display = 'block';
 
     try {
-        // Step 1: Get coordinates (simulated/hardcoded for Kolkata)
-        // In a real app, this would use a Geolocation API or an async call
         STATE.lat = 22.5726; 
         STATE.lng = 88.3639;
-        STATE.city = "Kolakata"; // Hardcoded City Name
+        STATE.city = "Kolakata"; 
 
-        // Step 2: Fetch Tide Data
         const tideResponse = await fetch(`https://tide.dynv6.net/api/tide?lat=${STATE.lat}&lng=${STATE.lng}`);
         if (!tideResponse.ok) throw new Error('Tide API call failed');
         const tideData = await tideResponse.json();
 
-        // Step 3: Fetch Moon Data for dynamic level estimation
         const moonResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${STATE.lat}&longitude=${STATE.lng}&daily=moonrise,moonset,moon_phase&timezone=auto`);
         if (!moonResponse.ok) throw new Error('Moon API call failed');
         const moonData = await moonResponse.json();
         
-        // Data processing and level calculation (Simplified Estimation)
         STATE.tides = tideData.tides || [];
 
-        // Simplified Level Calculation (Based on time progression between last High/Low tide)
         const now = new Date().getTime();
         let lastTide = null;
         let nextTide = null;
         
-        // Find the last passed tide and the next upcoming tide
         for (let i = 0; i < STATE.tides.length; i++) {
             const tideTime = new Date(STATE.tides[i].time).getTime();
             if (tideTime < now) {
@@ -342,50 +349,40 @@ async function loadAllData() {
             const elapsed = now - lastTime;
             let ratio = elapsed / duration;
             
-            // Adjust ratio to a value between 0 and 1
             if (ratio > 1) ratio = 1;
             if (ratio < 0) ratio = 0;
 
-            // Simple wave function (like a half-sine wave) for level percentage
             let levelPercent;
             if (lastTide.type === 'Low' && nextTide.type === 'High') {
-                // Low to High: 0% to 100%
                 levelPercent = 50 * (1 - Math.cos(ratio * Math.PI)) + 50; 
             } else if (lastTide.type === 'High' && nextTide.type === 'Low') {
-                // High to Low: 100% to 0%
                 levelPercent = 50 * (1 + Math.cos(ratio * Math.PI)); 
             } else {
-                levelPercent = 50; // Fallback
+                levelPercent = 50; 
             }
             
-            // Apply Moon Phase Multiplier (Very basic, just for visual effect)
-            const moonPhase = moonData.daily.moon_phase[0] || 0.5; // 0=New, 0.5=Quarter, 1=Full
-            const tideRangeMultiplier = 0.5 + Math.abs(0.5 - moonPhase); // Range 0.5 to 1.0
+            const moonPhase = moonData.daily.moon_phase[0] || 0.5;
+            const tideRangeMultiplier = 0.5 + Math.abs(0.5 - moonPhase); 
             
-            // Final Level Estimate (Between 0 and 100)
             STATE.level = Math.max(0, Math.min(100, levelPercent * tideRangeMultiplier * 1.5)); 
         } else {
-            STATE.level = 50; // Default if data is incomplete
+            STATE.level = 50; 
         }
         
     } catch (e) {
         console.error("Error loading tide data:", e);
         STATE.tides = null; 
-        STATE.level = 50; // Keep level at 50% on error
+        STATE.level = 50; 
     }
 
-    // Hide loading message and render UI
     document.getElementById('loading-message').style.display = 'none';
     buildWidget(STATE);
 }
 
-// 30 সেকেন্ড অন্তর UI আপডেট (সময় ও বর্তমান জলস্তর)
 function updateUI() {
     const timeDisplay = document.getElementById('local-time-display');
     if (timeDisplay) timeDisplay.textContent = getBengaliTime(new Date());
 
-    // Only update level based on current time (no need to fetch data again)
-    // Rerun the level calculation logic
     if (STATE.tides) {
         const now = new Date().getTime();
         let lastTide = null;
@@ -420,15 +417,13 @@ function updateUI() {
                 levelPercent = 50;
             }
             
-            // For simplicity, we skip re-fetching moon data, and just apply a rough multiplier
-            STATE.level = Math.max(0, Math.min(100, levelPercent * 1.2)); // Assume an average multiplier
+            STATE.level = Math.max(0, Math.min(100, levelPercent * 1.2)); 
         } else {
             STATE.level = 50;
         }
 
         updateLevelUI(STATE.level);
         
-        // Highlight the current tide correctly on UI update
         const tideListContainer = document.getElementById('tide-list-container');
         if (tideListContainer) {
              tideListContainer.innerHTML = buildTideList(STATE.tides);
@@ -436,26 +431,13 @@ function updateUI() {
     }
 }
 
-// উইজেট শুরু করার ফাংশন
 function initializeWidget() {
-    // প্রাথমিক ডাটা লোড
     loadAllData(); 
-    
-    // প্রতি 30 সেকেন্ডে UI আপডেট (সময় এবং জলস্তর)
     updateUIInterval = setInterval(updateUI, 30000); 
-    
-    // প্রতি 3 ঘন্টায় ডাটা পুনরায় লোড করা (API কল)
-    updateDataInterval = setInterval(loadAllData, 3 * 60 * 60 * 1000); // 3 ঘন্টা
+    updateDataInterval = setInterval(loadAllData, 3 * 60 * 60 * 1000); 
 }
 
-// DOM লোড হওয়ার পর উইজেট শুরু করুন
 window.onload = initializeWidget; 
 
-/* পরিষ্কারের জন্য: যদি উইজেটটি কখনও রিমুভ করতে হয়, এই ফাংশনগুলি ব্যবহার করুন
-function cleanupWidget() {
-    clearInterval(updateUIInterval);
-    clearInterval(updateDataInterval);
-}
-*/
-            </script>
-            
+        </script>
+        
